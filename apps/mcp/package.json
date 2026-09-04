@@ -1,0 +1,19 @@
+{
+  "name": "@cluby/mcp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": { "cluby-mcp": "src/index.ts" },
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cluby/config": "workspace:*",
+    "@cluby/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "viem": "2.56.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": { "@types/node": "^22", "typescript": "^5.7" }
+}
