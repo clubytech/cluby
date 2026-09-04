@@ -25,7 +25,7 @@ type Props = {
   loanDecimals: number;
 };
 
-const tabs = ["Borrow", "Multiply"] as const;
+const tabs = ["Borrow", "Multiply", "Manage"] as const;
 const BLUE = morpho.blue.address as `0x${string}`;
 const LEVERAGE_ROUTER = deployments.leverageRouter as `0x${string}` | undefined;
 
@@ -53,6 +53,8 @@ export function PositionPanel(p: Props) {
           { address: p.collateralAddress, abi: erc20Abi, functionName: "allowance", args: [me, BLUE] },
           { address: BLUE, abi: morphoBlueAbi, functionName: "isAuthorized", args: [me, router] },
           { address: p.collateralAddress, abi: erc20Abi, functionName: "allowance", args: [me, router] },
+          { address: BLUE, abi: morphoBlueAbi, functionName: "position", args: [p.marketId, me] },
+          { address: BLUE, abi: morphoBlueAbi, functionName: "market", args: [p.marketId] },
         ]
       : [];
 
@@ -69,6 +71,20 @@ export function PositionPanel(p: Props) {
   const allowance = (onChain?.[2]?.result as bigint | undefined) ?? 0n;
   const routerAuthorized = (onChain?.[3]?.result as boolean | undefined) ?? false;
   const routerAllowance = (onChain?.[4]?.result as bigint | undefined) ?? 0n;
+  const myPosition = onChain?.[5]?.result as readonly [bigint, bigint, bigint] | undefined;
+  const marketState = onChain?.[6]?.result as
+    | readonly [bigint, bigint, bigint, bigint, bigint, bigint]
+    | undefined;
+
+  // Debt in assets, rounded up the way Morpho rounds it against the borrower, so "repay all" does
+  // not leave a wei of dust behind and a position that will not close.
+  const myBorrowShares = myPosition?.[1] ?? 0n;
+  const myCollateral = myPosition?.[2] ?? 0n;
+  const myDebt =
+    marketState && marketState[3] > 0n
+      ? (myBorrowShares * (marketState[2] + 1n) + (marketState[3] + 1_000_000n - 1n)) /
+        (marketState[3] + 1_000_000n)
+      : 0n;
 
   const price = p.price ?? 0;
   const collateralValue = collateral;
@@ -179,6 +195,58 @@ export function PositionPanel(p: Props) {
     await run(`Open ${leverage.toFixed(1)}× on ${p.subject}`, calls as never);
   }
 
+  /**
+   * Close out. Repay by SHARES rather than assets: interest accrues between the quote and the
+   * transaction landing, so an assets-denominated "repay everything" always leaves dust and a
+   * position that cannot be withdrawn from.
+   */
+  async function repayAll() {
+    if (!params || !address || myBorrowShares === 0n) return;
+    const marketParams = {
+      loanToken: params[0],
+      collateralToken: params[1],
+      oracle: params[2],
+      irm: params[3],
+      lltv: params[4],
+    };
+
+    const calls = [
+      {
+        address: params[0],
+        abi: erc20Abi,
+        functionName: "approve",
+        // A little over the debt, because it grows while the wallet is open.
+        args: [BLUE, (myDebt * 101n) / 100n + 1n],
+      },
+      {
+        address: BLUE,
+        abi: morphoBlueAbi,
+        functionName: "repay",
+        args: [marketParams, 0n, myBorrowShares, address, "0x"],
+      },
+    ];
+    await run("Repay the whole debt", calls as never);
+  }
+
+  async function withdrawCollateral() {
+    if (!params || !address || myCollateral === 0n) return;
+    const marketParams = {
+      loanToken: params[0],
+      collateralToken: params[1],
+      oracle: params[2],
+      irm: params[3],
+      lltv: params[4],
+    };
+    await run("Withdraw collateral", [
+      {
+        address: BLUE,
+        abi: morphoBlueAbi,
+        functionName: "withdrawCollateral",
+        args: [marketParams, myCollateral, address, address],
+      },
+    ] as never);
+  }
+
   const disabled = p.status !== "listed";
 
   return (
@@ -243,6 +311,22 @@ export function PositionPanel(p: Props) {
                 Capped at {pct(p.safeLtv, 1)} — a margin below the {pct(p.lltv, 1)} liquidation line.
               </span>
             </label>
+          ) : tab === "Manage" ? (
+            <div className="flex flex-col gap-3 rounded-2xl bg-bg-weak p-4 text-sm">
+              <Row label="Your collateral" value={`${(Number(myCollateral) / 10 ** p.collateralDecimals).toFixed(4)} ${p.subject}`} />
+              <Row label="Your debt" value={usd(Number(myDebt) / 10 ** p.loanDecimals)} />
+              <Row
+                label="Health factor"
+                value={
+                  myDebt === 0n
+                    ? "—"
+                    : (
+                        ((Number(myCollateral) / 10 ** p.collateralDecimals) * price * p.lltv) /
+                        (Number(myDebt) / 10 ** p.loanDecimals)
+                      ).toFixed(2)
+                }
+              />
+            </div>
           ) : (
             <label className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between">
@@ -293,7 +377,30 @@ export function PositionPanel(p: Props) {
             )}
           </div>
 
-          {disabled ? (
+          {tab === "Manage" && isConnected && !disabled ? (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={repayAll}
+                disabled={busy || myBorrowShares === 0n}
+                className="w-full rounded-full bg-bg-strong px-6 py-3 text-sm font-medium text-white hover:bg-bg-mid disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-text-soft"
+              >
+                {myBorrowShares === 0n ? "No debt to repay" : `Repay ${usd(Number(myDebt) / 10 ** p.loanDecimals)}`}
+              </button>
+              <button
+                type="button"
+                onClick={withdrawCollateral}
+                disabled={busy || myCollateral === 0n || myBorrowShares > 0n}
+                className="w-full rounded-full bg-brand-bright px-6 py-3 text-sm font-medium text-bg-deep hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-text-soft"
+              >
+                {myCollateral === 0n
+                  ? "No collateral posted"
+                  : myBorrowShares > 0n
+                    ? "Repay first, then withdraw"
+                    : `Withdraw ${(Number(myCollateral) / 10 ** p.collateralDecimals).toFixed(4)} ${p.subject}`}
+              </button>
+            </div>
+          ) : disabled ? (
             <button type="button" disabled className="w-full cursor-not-allowed rounded-full bg-bg-soft px-6 py-3 text-sm text-text-soft">
               Market not created yet
             </button>
