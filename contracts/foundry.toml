@@ -12,7 +12,8 @@ via_ir = false
 # The deploy scripts read the JSON catalog field by field, which the legacy codegen cannot fit in
 # stack slots — they build under [profile.deploy] instead, so day-to-day `forge build`/`forge test`
 # stay on the fast pipeline. Run deploys with FOUNDRY_PROFILE=deploy.
-skip = ["script/**"]
+# The vault sources and their tests pin solc 0.8.26; they build under [profile.vault].
+skip = ["script/**", "test/fork/Vault.fork.t.sol"]
 fs_permissions = [{ access = "read-write", path = "./" }]
 remappings = [
   "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
