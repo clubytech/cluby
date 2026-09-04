@@ -85,6 +85,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@cluby/abi':
+        specifier: workspace:*
+        version: link:../../packages/abi
       '@cluby/config':
         specifier: workspace:*
         version: link:../../packages/config

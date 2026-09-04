@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { erc20Abi, morphoBlueAbi } from "@cluby/sdk";
-import { morpho } from "@cluby/config";
+import { leverageRouterAbi } from "@cluby/abi";
+import { deployments, morpho } from "@cluby/config";
 import { pct, usd } from "@/lib/format";
 import { healthFactor, liquidationPrice, leveragePlan } from "@/lib/position-math";
 import { useTx } from "@/lib/use-tx";
@@ -26,6 +27,7 @@ type Props = {
 
 const tabs = ["Borrow", "Multiply"] as const;
 const BLUE = morpho.blue.address as `0x${string}`;
+const LEVERAGE_ROUTER = deployments.leverageRouter as `0x${string}` | undefined;
 
 export function PositionPanel(p: Props) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("Borrow");
@@ -36,33 +38,37 @@ export function PositionPanel(p: Props) {
   const { address, isConnected } = useAccount();
   const { run, busy } = useTx();
 
-  const { data: onChain } = useReadContracts({
-    contracts:
-      p.marketId && p.collateralAddress
-        ? [
-            { address: BLUE, abi: morphoBlueAbi, functionName: "idToMarketParams", args: [p.marketId] },
-            {
-              address: p.collateralAddress,
-              abi: erc20Abi,
-              functionName: "balanceOf",
-              args: [address ?? "0x0000000000000000000000000000000000000000"],
-            },
-            {
-              address: p.collateralAddress,
-              abi: erc20Abi,
-              functionName: "allowance",
-              args: [address ?? "0x0000000000000000000000000000000000000000", BLUE],
-            },
-          ]
-        : [],
+  const zero = "0x0000000000000000000000000000000000000000" as const;
+  const me = address ?? zero;
+  const router = LEVERAGE_ROUTER ?? zero;
+
+  // One multicall for everything the panel needs about this user and market. wagmi's inference
+  // cannot type a heterogeneous list built conditionally, so it is cast once here rather than
+  // splitting the reads into four hooks that would each cost a round trip.
+  const reads =
+    p.marketId && p.collateralAddress
+      ? [
+          { address: BLUE, abi: morphoBlueAbi, functionName: "idToMarketParams", args: [p.marketId] },
+          { address: p.collateralAddress, abi: erc20Abi, functionName: "balanceOf", args: [me] },
+          { address: p.collateralAddress, abi: erc20Abi, functionName: "allowance", args: [me, BLUE] },
+          { address: BLUE, abi: morphoBlueAbi, functionName: "isAuthorized", args: [me, router] },
+          { address: p.collateralAddress, abi: erc20Abi, functionName: "allowance", args: [me, router] },
+        ]
+      : [];
+
+  const { data } = useReadContracts({
+    contracts: reads as never,
     query: { enabled: Boolean(p.marketId && p.collateralAddress && address) },
   });
+  const onChain = data as { result?: unknown }[] | undefined;
 
   const params = onChain?.[0]?.result as
     | readonly [`0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`, bigint]
     | undefined;
   const walletBalance = (onChain?.[1]?.result as bigint | undefined) ?? 0n;
   const allowance = (onChain?.[2]?.result as bigint | undefined) ?? 0n;
+  const routerAuthorized = (onChain?.[3]?.result as boolean | undefined) ?? false;
+  const routerAllowance = (onChain?.[4]?.result as bigint | undefined) ?? 0n;
 
   const price = p.price ?? 0;
   const collateralValue = collateral;
@@ -115,6 +121,62 @@ export function PositionPanel(p: Props) {
     }
 
     await run(`Borrow ${usd(debt)} against ${(collateral / (price || 1)).toFixed(4)} ${p.subject}`, calls as never);
+  }
+
+  /**
+   * Multiply needs the router to act on the user's behalf inside Morpho. That authorisation is
+   * asked for on its own, before any position exists: bundling it into the same click would hide
+   * what is being granted, and it is the one grant that outlives the transaction.
+   */
+  async function authorizeRouter() {
+    if (!LEVERAGE_ROUTER) return;
+    await run("Authorise the Multiply router", [
+      { address: BLUE, abi: morphoBlueAbi, functionName: "setAuthorization", args: [LEVERAGE_ROUTER, true] },
+    ] as never);
+  }
+
+  async function openLeveraged() {
+    if (!params || !address || !p.collateralAddress || !LEVERAGE_ROUTER || price === 0) return;
+    const marketParams = {
+      loanToken: params[0],
+      collateralToken: params[1],
+      oracle: params[2],
+      irm: params[3],
+      lltv: params[4],
+    };
+
+    const equityUnits = BigInt(Math.round((collateral / price) * 10 ** p.collateralDecimals));
+    const flashUnits = BigInt(Math.round(plan.debt * 10 ** p.loanDecimals));
+    // Three points of room against the oracle price for pool fees and movement; past that the swap
+    // reverts rather than opening the position at somebody else's price.
+    const minCollateralOut = BigInt(Math.round((plan.debt / price) * 0.97 * 10 ** p.collateralDecimals));
+
+    const calls = [];
+    if (routerAllowance < equityUnits) {
+      calls.push({
+        address: p.collateralAddress,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [LEVERAGE_ROUTER, equityUnits],
+      });
+    }
+    calls.push({
+      address: LEVERAGE_ROUTER,
+      abi: leverageRouterAbi,
+      functionName: "open",
+      args: [
+        {
+          marketParams,
+          equityCollateral: equityUnits,
+          flashAmount: flashUnits,
+          swapFee: 500,
+          minCollateralOut,
+          onBehalf: address,
+        },
+      ],
+    });
+
+    await run(`Open ${leverage.toFixed(1)}× on ${p.subject}`, calls as never);
   }
 
   const disabled = p.status !== "listed";
@@ -238,9 +300,35 @@ export function PositionPanel(p: Props) {
           ) : !isConnected ? (
             <ConnectButton />
           ) : tab === "Multiply" ? (
-            <button type="button" disabled className="w-full cursor-not-allowed rounded-full bg-bg-soft px-6 py-3 text-sm text-text-soft">
-              Multiply needs one Morpho authorisation — coming next
-            </button>
+            !LEVERAGE_ROUTER ? (
+              <button type="button" disabled className="w-full cursor-not-allowed rounded-full bg-bg-soft px-6 py-3 text-sm text-text-soft">
+                Multiply router not deployed
+              </button>
+            ) : !routerAuthorized ? (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={authorizeRouter}
+                  disabled={busy}
+                  className="w-full rounded-full bg-bg-strong px-6 py-3 text-sm font-medium text-white hover:bg-bg-mid disabled:opacity-60"
+                >
+                  {busy ? "Signing…" : "Authorise the Multiply router"}
+                </button>
+                <p className="text-xs text-text-soft">
+                  One signature, once. It lets the router supply and borrow for you inside a single
+                  transaction; revoking it later locks the router out completely.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openLeveraged}
+                disabled={busy || collateral === 0 || leverage <= 1}
+                className="w-full rounded-full bg-brand-bright px-6 py-3 text-sm font-medium text-bg-deep hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-text-soft"
+              >
+                {busy ? "Signing…" : `Open ${leverage.toFixed(1)}× position`}
+              </button>
+            )
           ) : (
             <button
               type="button"

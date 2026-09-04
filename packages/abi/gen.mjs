@@ -14,6 +14,10 @@ mkdirSync(dst, { recursive: true });
 const contracts = {
   lens: "Lens.sol/Lens.json",
   flashLiquidator: "FlashLiquidator.sol/FlashLiquidator.json",
+  leverageRouter: "LeverageRouter.sol/LeverageRouter.json",
+  stakingRewards: "StakingRewards.sol/StakingRewards.json",
+  merkleDistributor: "MerkleDistributor.sol/MerkleDistributor.json",
+  creditRegistry: "CreditRegistry.sol/CreditRegistry.json",
 };
 
 const index = [];
