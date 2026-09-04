@@ -257,4 +257,8 @@ export const vaultAbi = [
   { type: "function", name: "supplyQueueLength", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "supplyQueue", stateMutability: "view", inputs: [{ name: "i", type: "uint256" }], outputs: [{ type: "bytes32" }] },
   { type: "function", name: "config", stateMutability: "view", inputs: [{ name: "id", type: "bytes32" }], outputs: [{ name: "cap", type: "uint184" }, { name: "enabled", type: "bool" }, { name: "removableAt", type: "uint64" }] },
+  { type: "function", name: "timelock", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "name", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
 ] as const;

@@ -47,13 +47,28 @@ export default async function EarnPage() {
                     {v.markets.length === 0 ? (
                       <span className="text-xs text-text-soft">Market list opens with the vault.</span>
                     ) : (
-                      v.markets.map((m) => (
-                        <span key={m.key} className="num rounded-full border border-line px-3 py-1 text-xs text-text-soft">
-                          {m.key} · {pct(m.lltv, 1)}
-                        </span>
-                      ))
+                      v.markets.map((m) => {
+                        const cap = v.caps.find((c) => c.key === m.key);
+                        return (
+                          <span
+                            key={m.key}
+                            className="num rounded-full border border-line px-3 py-1 text-xs text-text-soft"
+                          >
+                            {m.key} · {pct(m.lltv, 1)}
+                            {cap && cap.enabled ? ` · cap ${usd(cap.capUsd, 0)}` : ""}
+                          </span>
+                        );
+                      })
                     )}
                   </div>
+                  {v.address && (
+                    <p className="num mt-4 break-all text-xs text-text-soft">
+                      {v.address}
+                      {v.timelockSeconds === 0
+                        ? " · no timelock yet"
+                        : ` · ${Math.round(v.timelockSeconds / 3600)}h timelock`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">

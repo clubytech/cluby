@@ -15,6 +15,8 @@ import {
   getMarketParams,
   getMarketState,
   getRates,
+  getVaultMarketConfig,
+  getVaultState,
   maxAgeOf,
   poolOf,
   readFeed,
@@ -195,6 +197,8 @@ async function readMarkets(): Promise<MarketView[]> {
   );
 }
 
+export type VaultCap = { key: string; capUsd: number; enabled: boolean };
+
 export type VaultView = {
   key: string;
   kind: string;
@@ -209,6 +213,9 @@ export type VaultView = {
   totalAssetsUsd: number;
   withdrawableUsd: number;
   apy: number | null;
+  /** Seconds an owner must wait before a parameter change takes effect. Zero means none yet. */
+  timelockSeconds: number;
+  caps: VaultCap[];
   markets: MarketView[];
 };
 
@@ -216,33 +223,69 @@ export async function getVaults(): Promise<VaultView[]> {
   const markets = await getMarkets();
   const byKey = new Map(markets.map((m) => [m.key, m]));
 
-  return vaultCatalog.map((v) => {
-    const mine = v.markets.map((k) => byKey.get(k)).filter((m): m is MarketView => Boolean(m));
-    const listed = mine.filter((m) => m.status === "listed");
-    const totalAssets = listed.reduce((a, m) => a + m.totalSupplyUsd, 0);
-    const withdrawable = listed.reduce((a, m) => a + m.liquidityUsd, 0);
-    const apy =
-      totalAssets === 0
-        ? null
-        : listed.reduce((a, m) => a + (m.supplyApr ?? 0) * m.totalSupplyUsd, 0) / totalAssets;
+  return Promise.all(
+    vaultCatalog.map(async (v) => {
+      const mine = v.markets.map((k) => byKey.get(k)).filter((m): m is MarketView => Boolean(m));
+      const listed = mine.filter((m) => m.status === "listed");
+      const address = (deployments.vaults[v.key] ?? null) as `0x${string}` | null;
 
-    return {
-      key: v.key,
-      kind: v.kind,
-      name: v.name,
-      symbol: v.symbol,
-      asset: v.asset,
-      description: v.description,
-      status: listed.length > 0 ? ("listed" as const) : v.status,
-      address: (deployments.vaults[v.key] ?? null) as `0x${string}` | null,
-      performanceFee: Number(economics.introFeeWad) / 1e18,
-      introFeeDays: economics.introDays,
-      totalAssetsUsd: totalAssets,
-      withdrawableUsd: withdrawable,
-      apy,
-      markets: mine,
-    };
-  });
+      // Rates come from the markets the vault lends into, weighted by what sits in each.
+      const suppliedTotal = listed.reduce((a, m) => a + m.totalSupplyUsd, 0);
+      const apy =
+        suppliedTotal === 0
+          ? null
+          : listed.reduce((a, m) => a + (m.supplyApr ?? 0) * m.totalSupplyUsd, 0) / suppliedTotal;
+
+      const base = {
+        key: v.key,
+        kind: v.kind,
+        name: v.name,
+        symbol: v.symbol,
+        asset: v.asset,
+        description: v.description,
+        address,
+        performanceFee: Number(economics.introFeeWad) / 1e18,
+        introFeeDays: economics.introDays,
+        apy,
+        markets: mine,
+      };
+
+      if (!address) {
+        return {
+          ...base,
+          status: v.status,
+          totalAssetsUsd: 0,
+          withdrawableUsd: 0,
+          timelockSeconds: 0,
+          caps: [],
+        };
+      }
+
+      // Deployed: the vault's own accounting is the truth, not a sum over markets.
+      const state = await getVaultState(publicClient, address).catch(() => null);
+      const caps = await Promise.all(
+        mine.map(async (m) => {
+          if (!m.marketId) return { key: m.key, capUsd: 0, enabled: false };
+          const c = await getVaultMarketConfig(publicClient, address, m.marketId).catch(() => null);
+          return { key: m.key, capUsd: c ? Number(c.cap) / 1e6 : 0, enabled: c?.enabled ?? false };
+        }),
+      );
+
+      return {
+        ...base,
+        status: "listed" as const,
+        totalAssetsUsd: state ? Number(state.totalAssets) / 1e6 : 0,
+        performanceFee: state ? Number(state.fee) / 1e18 : base.performanceFee,
+        // What can leave right now is what the markets have not lent out.
+        withdrawableUsd: Math.min(
+          state ? Number(state.totalAssets) / 1e6 : 0,
+          listed.reduce((a, m) => a + m.liquidityUsd, 0),
+        ),
+        timelockSeconds: state ? Number(state.timelock) : 0,
+        caps,
+      };
+    }),
+  );
 }
 
 export async function getProtocolStats() {

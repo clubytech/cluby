@@ -51,3 +51,28 @@ robinhood_testnet = "https://rpc.testnet.chain.robinhood.com"
 via_ir = true
 optimizer_runs = 1000
 skip = []
+
+# MetaMorpho V1.1 is vendored from morpho-org/metamorpho-v1.1 and pins `pragma solidity 0.8.26`
+# exactly, so it cannot build under the 0.8.28 pin the rest of the tree uses. Its own profile lets
+# Foundry pick the version each file asks for, and keeps the vendored sources out of the default
+# build — they are deployed as audited, not edited.
+[profile.vault.lint]
+# Vendored, audited code: we do not edit it, so linting it produces noise we must not act on.
+lint_on_build = false
+
+[profile.vault]
+# Pinned to what the vendored sources demand. Our own 0.8.28 contracts are skipped rather than
+# compiled alongside: the two pragmas cannot share a compilation unit, and the vault deploy needs
+# nothing from src/ anyway.
+solc_version = "0.8.26"
+via_ir = true
+optimizer_runs = 200
+skip = ["src/**", "test/unit/**", "test/fork/MorphoStack*", "test/mocks/**", "script/CreateMarkets*", "script/DeployCore*", "script/SeedMarket*", "script/SetupForkMarket*"]
+# The vendored sources import OpenZeppelin by relative path, expecting a copy inside their own lib/.
+# Remapping it to the one we already have avoids a second 30 MB checkout that would then need
+# keeping in step.
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/",
+  "lib/metamorpho-v1.1/lib/openzeppelin-contracts/=lib/openzeppelin-contracts/",
+]

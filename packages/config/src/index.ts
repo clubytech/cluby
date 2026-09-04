@@ -203,7 +203,8 @@ export const morpho = {
   blue: { address: "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010", verified: true, codeSize: 15582 },
   adaptiveCurveIrm: { address: "0x2BD3d5965B26B51814AC95127B2b80dD6CcC0fa1", verified: true, codeSize: 2282 },
   chainlinkOracleV2Factory: { address: "0xB7c16F6F8cF531447Bf27Ca7220f981E79C9cdF2", verified: true, codeSize: 4464 },
-  metaMorphoFactory: { address: null, verified: false },
+  /** Not deployed by Morpho on this chain, so we deployed their factory ourselves, unmodified. */
+  metaMorphoFactory: { address: "0xD371727A6F3c5033204b6E4D5548EF4Ad40C9E20", verified: true },
   vaultV2Factory: { address: null, verified: false },
   bundler3: { address: null, verified: false },
   preLiquidationFactory: { address: null, verified: false },
@@ -428,7 +429,10 @@ export const deployments: {
   owner: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
   /** Block of the first Cluby deploy — where the indexer starts. */
   startBlock: 54451901,
-  vaults: {},
+  metaMorphoFactory: "0xD371727A6F3c5033204b6E4D5548EF4Ad40C9E20",
+  vaults: {
+    "core-usdg": "0x97e813828B0250dCa5c05FF2567dfD616E5b3C61",
+  },
   oracles: {
     NVDA: "0xB5736a58CE6370DaD1888d8996cf64A22e622BB8",
     SPY: "0x1bb6b9792e9852CB7bfEB14A5951394D07817b7D",

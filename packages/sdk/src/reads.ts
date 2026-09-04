@@ -180,13 +180,26 @@ export async function isTokenizedStock(client: PublicClient, token: Address) {
 }
 
 export async function getVaultState(client: PublicClient, vault: Address) {
-  const [totalAssets, totalSupply, asset, fee] = await Promise.all([
+  const [totalAssets, totalSupply, asset, fee, timelock, owner] = await Promise.all([
     client.readContract({ address: vault, abi: vaultAbi, functionName: "totalAssets" }),
     client.readContract({ address: vault, abi: vaultAbi, functionName: "totalSupply" }),
     client.readContract({ address: vault, abi: vaultAbi, functionName: "asset" }),
     client.readContract({ address: vault, abi: vaultAbi, functionName: "fee" }).catch(() => 0n),
+    client.readContract({ address: vault, abi: vaultAbi, functionName: "timelock" }).catch(() => 0n),
+    client.readContract({ address: vault, abi: vaultAbi, functionName: "owner" }).catch(() => null),
   ]);
-  return { totalAssets, totalSupply, asset, fee };
+  return { totalAssets, totalSupply, asset, fee, timelock, owner };
+}
+
+/** The cap a vault may lend into one market, and whether that market is enabled at all. */
+export async function getVaultMarketConfig(client: PublicClient, vault: Address, marketId: `0x${string}`) {
+  const c = await client.readContract({
+    address: vault,
+    abi: vaultAbi,
+    functionName: "config",
+    args: [marketId],
+  });
+  return { cap: c[0], enabled: c[1], removableAt: c[2] };
 }
 
 export const getBalance = (client: PublicClient, token: Address, owner: Address) =>
