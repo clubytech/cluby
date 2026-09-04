@@ -26,7 +26,13 @@ DEP_UNITS=$(python3 -c "print(int($DEPOSIT * 10**6))")
 COL_UNITS=$(python3 -c "print(int($COLLATERAL * 10**18))")
 BOR_UNITS=$(python3 -c "print(int($BORROW * 10**6))")
 
-export ETH_RPC_URL="$ROBINHOOD_RPC_URL"
+# Sends go to the PUBLIC node, not the archive one.
+#
+# Nothing here reads history, so the archive plan buys nothing — and it is the plan being shared
+# with the indexer, the site and the keeper, all of which poll it continuously. When its budget runs
+# out the symptoms are timeouts and an estimator claiming an account with 0.0145 ETH cannot afford
+# a 0.00002 ETH transaction. The public node has neither limit for what this script does.
+export ETH_RPC_URL="${CANARY_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}"
 say() { printf "\n\033[1m==> %s\033[0m\n" "$1"; }
 
 # This node intermittently refuses to estimate — it has already been caught returning a zero
@@ -75,7 +81,7 @@ send "approve Morpho" "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS"
 say "4/4  post collateral and borrow $BORROW USDG"
 (cd contracts && MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
   FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
-  --rpc-url "$ROBINHOOD_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast --slow \
+  --rpc-url "$ETH_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast --slow \
   --with-gas-price 2gwei) 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
 
 say "After"
