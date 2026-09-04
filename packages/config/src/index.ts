@@ -414,6 +414,8 @@ export const deployments: {
   merkleDistributor?: `0x${string}`;
   creditRegistry?: `0x${string}`;
   metaMorphoFactory?: `0x${string}`;
+  safe?: `0x${string}`;
+  deployer?: `0x${string}`;
   preLiquidationFactory?: `0x${string}`;
   preLiquidations?: Record<string, `0x${string}`>;
   owner?: `0x${string}`;
@@ -432,7 +434,14 @@ export const deployments: {
   leverageRouter: "0xBF6cdE3F772cB3939dFCc313AA4E83C3452bab6B",
   /** Scores only; it moves what a borrower is paid, never what they may borrow. */
   creditRegistry: "0x86e8f3Bf88087774a530d70FfaD19b5257054E53",
-  owner: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
+  /**
+   * Safe 1.4.1+L2, 1-of-1 on the deploy key for now — add owners and raise the threshold from the
+   * Safe itself. It owns the vault, the liquidator and the credit registry; the deploy key owns
+   * nothing any more.
+   */
+  safe: "0x90a82053b9012b6ea2D95f88ee81da969d4D8A85",
+  owner: "0x90a82053b9012b6ea2D95f88ee81da969d4D8A85",
+  deployer: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
   /** Block of the first Cluby deploy — where the indexer starts. */
   startBlock: 54451901,
   metaMorphoFactory: "0xD371727A6F3c5033204b6E4D5548EF4Ad40C9E20",
