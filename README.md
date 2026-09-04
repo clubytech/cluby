@@ -19,6 +19,7 @@ position from becoming bad debt.
 | MetaMorphoV1_1Factory | `0xD371727A6F3c5033204b6E4D5548EF4Ad40C9E20` |
 | PreLiquidationFactory | `0xe57CC1F0ED5E760D2EcAaa04a1E0d1c690daAa0e` |
 | Cluby Core USDG (cUSDG) | `0x97e813828B0250dCa5c05FF2567dfD616E5b3C61` |
+| Safe — owns the three above | `0x90a82053b9012b6ea2D95f88ee81da969d4D8A85` |
 
 Seventeen markets: SGOV at 86% LLTV, ETH at 77%, nine stocks and two short markets at 62.5%,
 four long-tail at 38.5%. Full list with ids in `packages/config`.
@@ -74,3 +75,7 @@ fees to distribute.
 
 The vault's timelock is **zero**, which means the owner can change a cap and move liquidity in one
 block. That must be raised to 24h before anyone else's money is in it.
+
+The Safe is 1-of-1 on a single key. One signature is not a multisig: it removes the risk of a
+contract owned by a key that gets lost, not the risk of a key that gets stolen. Add owners and raise
+the threshold before there is anything worth stealing.
