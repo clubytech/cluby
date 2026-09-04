@@ -50,7 +50,9 @@ async function main() {
     await alert("watch-only", "Keeper started without a key: it will report what it would have done, and sign nothing.");
   }
 
-  await safely("watchdog", watchdogPass);
+  // The watchdog is started, not awaited: liquidations are the job that cannot wait, and on a
+  // forked or slow endpoint a price sweep across every market can take tens of seconds.
+  void safely("watchdog", watchdogPass);
   setInterval(() => void safely("watchdog", watchdogPass), WATCHDOG_MS);
 
   for (;;) {

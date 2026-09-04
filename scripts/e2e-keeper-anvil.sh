@@ -19,6 +19,10 @@ echo "==> forking Robinhood Chain"
 anvil --fork-url "$ROBINHOOD_RPC_URL" --port "$ANVIL_PORT" --silent &
 ANVIL_PID=$!
 until cast block-number --rpc-url "$RPC" >/dev/null 2>&1; do sleep 0.5; done
+# Everything the keeper needs to see happens in anvil's own blocks after this point. Scanning from
+# here keeps eth_getLogs local — anvil forwards anything older upstream, where the free tier caps a
+# range at ten blocks and the scan dies.
+BASE_BLOCK=$(cast block-number --rpc-url "$RPC")
 
 echo "==> funding the test account"
 USDG=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
@@ -55,17 +59,17 @@ echo "==> starting the keeper"
 rm -f apps/keeper/.keeper-state.json
 (cd apps/keeper && RPC_URL="$RPC" KEEPER_PK="$PK" LENS_ADDR="$LENS" FLASH_LIQ_ADDR="$LIQ" \
   MARKETS_JSON="{\"NVDA-FORK\":{\"id\":\"$MARKET_ID\",\"oracle\":\"$ORACLE\"}}" \
-  START_BLOCK=$(cast block-number --rpc-url "$RPC") LOG_CHUNK=9000 POLL_MS=1500 \
+  START_BLOCK="$BASE_BLOCK" LOG_CHUNK=10 POLL_MS=1500 \
   node --experimental-strip-types src/index.ts > /tmp/keeper-e2e.log 2>&1) &
 KEEPER_PID=$!
 
-for _ in $(seq 1 45); do
-  grep -q "Liquidated" /tmp/keeper-e2e.log && break
+for _ in $(seq 1 90); do
+  [ -f /tmp/keeper-e2e.log ] && grep -q "Liquidated" /tmp/keeper-e2e.log && break
   sleep 1
 done
 
 echo "==> keeper log"
-tail -12 /tmp/keeper-e2e.log
+tail -20 /tmp/keeper-e2e.log
 
 if grep -q "Liquidated" /tmp/keeper-e2e.log; then
   OWNER_AFTER=$(cast call "$USDG" "balanceOf(address)(uint256)" "$ACCOUNT" --rpc-url "$RPC" | awk '{print $1}')
