@@ -24,42 +24,47 @@ type Meta {
 type Query {
   market(id: String!): market
   markets(where: marketFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): marketPage!
+  vault(id: String!): vault
+  vaults(where: vaultFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): vaultPage!
+  vaultAllocation(id: String!): vaultAllocation
+  vaultAllocations(where: vaultAllocationFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): vaultAllocationPage!
   position(id: String!): position
   positions(where: positionFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): positionPage!
   txEvent(id: String!): txEvent
   txEvents(where: txEventFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): txEventPage!
   liquidation(id: String!): liquidation
   liquidations(where: liquidationFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): liquidationPage!
-  accrual(id: String!): accrual
-  accruals(where: accrualFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): accrualPage!
-  feedTick(id: String!): feedTick
-  feedTicks(where: feedTickFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): feedTickPage!
-  stockToken(address: String!): stockToken
-  stockTokens(where: stockTokenFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): stockTokenPage!
   snapshot(id: String!): snapshot
   snapshots(where: snapshotFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): snapshotPage!
+  feedTick(id: String!): feedTick
+  feedTicks(where: feedTickFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): feedTickPage!
+  creditScore(id: String!): creditScore
+  creditScores(where: creditScoreFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): creditScorePage!
+  rebateEpoch(id: String!): rebateEpoch
+  rebateEpochs(where: rebateEpochFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): rebateEpochPage!
+  builder(id: String!): builder
+  builders(where: builderFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): builderPage!
   _meta: Meta
 }
 
 type market {
   id: String!
-  stock: String!
-  symbol: String!
-  collateral: String!
+  key: String!
+  loanToken: String!
+  collateralToken: String!
   oracle: String!
   irm: String!
-  initialMarginBps: Int!
-  liqThresholdBps: Int!
-  liqBonusBps: Int!
-  borrowCap: BigInt!
-  flags: Int!
-  feeBps: Int!
+  lltv: BigInt!
   totalSupplyAssets: BigInt!
   totalSupplyShares: BigInt!
   totalBorrowAssets: BigInt!
   totalBorrowShares: BigInt!
+  fee: BigInt!
   lastUpdate: Int!
   createdAt: Int!
+  interestAccrued: BigInt!
+  liquidationCount: Int!
+  badDebtAssets: BigInt!
 }
 
 type marketPage {
@@ -81,42 +86,42 @@ input marketFilter {
   id_ends_with: String
   id_not_starts_with: String
   id_not_ends_with: String
-  stock: String
-  stock_not: String
-  stock_in: [String]
-  stock_not_in: [String]
-  stock_contains: String
-  stock_not_contains: String
-  stock_starts_with: String
-  stock_ends_with: String
-  stock_not_starts_with: String
-  stock_not_ends_with: String
-  symbol: String
-  symbol_not: String
-  symbol_in: [String]
-  symbol_not_in: [String]
-  symbol_contains: String
-  symbol_not_contains: String
-  symbol_starts_with: String
-  symbol_ends_with: String
-  symbol_not_starts_with: String
-  symbol_not_ends_with: String
-  symbol_contains_nocase: String
-  symbol_not_contains_nocase: String
-  symbol_starts_with_nocase: String
-  symbol_ends_with_nocase: String
-  symbol_not_starts_with_nocase: String
-  symbol_not_ends_with_nocase: String
-  collateral: String
-  collateral_not: String
-  collateral_in: [String]
-  collateral_not_in: [String]
-  collateral_contains: String
-  collateral_not_contains: String
-  collateral_starts_with: String
-  collateral_ends_with: String
-  collateral_not_starts_with: String
-  collateral_not_ends_with: String
+  key: String
+  key_not: String
+  key_in: [String]
+  key_not_in: [String]
+  key_contains: String
+  key_not_contains: String
+  key_starts_with: String
+  key_ends_with: String
+  key_not_starts_with: String
+  key_not_ends_with: String
+  key_contains_nocase: String
+  key_not_contains_nocase: String
+  key_starts_with_nocase: String
+  key_ends_with_nocase: String
+  key_not_starts_with_nocase: String
+  key_not_ends_with_nocase: String
+  loanToken: String
+  loanToken_not: String
+  loanToken_in: [String]
+  loanToken_not_in: [String]
+  loanToken_contains: String
+  loanToken_not_contains: String
+  loanToken_starts_with: String
+  loanToken_ends_with: String
+  loanToken_not_starts_with: String
+  loanToken_not_ends_with: String
+  collateralToken: String
+  collateralToken_not: String
+  collateralToken_in: [String]
+  collateralToken_not_in: [String]
+  collateralToken_contains: String
+  collateralToken_not_contains: String
+  collateralToken_starts_with: String
+  collateralToken_ends_with: String
+  collateralToken_not_starts_with: String
+  collateralToken_not_ends_with: String
   oracle: String
   oracle_not: String
   oracle_in: [String]
@@ -137,54 +142,14 @@ input marketFilter {
   irm_ends_with: String
   irm_not_starts_with: String
   irm_not_ends_with: String
-  initialMarginBps: Int
-  initialMarginBps_not: Int
-  initialMarginBps_in: [Int]
-  initialMarginBps_not_in: [Int]
-  initialMarginBps_gt: Int
-  initialMarginBps_lt: Int
-  initialMarginBps_gte: Int
-  initialMarginBps_lte: Int
-  liqThresholdBps: Int
-  liqThresholdBps_not: Int
-  liqThresholdBps_in: [Int]
-  liqThresholdBps_not_in: [Int]
-  liqThresholdBps_gt: Int
-  liqThresholdBps_lt: Int
-  liqThresholdBps_gte: Int
-  liqThresholdBps_lte: Int
-  liqBonusBps: Int
-  liqBonusBps_not: Int
-  liqBonusBps_in: [Int]
-  liqBonusBps_not_in: [Int]
-  liqBonusBps_gt: Int
-  liqBonusBps_lt: Int
-  liqBonusBps_gte: Int
-  liqBonusBps_lte: Int
-  borrowCap: BigInt
-  borrowCap_not: BigInt
-  borrowCap_in: [BigInt]
-  borrowCap_not_in: [BigInt]
-  borrowCap_gt: BigInt
-  borrowCap_lt: BigInt
-  borrowCap_gte: BigInt
-  borrowCap_lte: BigInt
-  flags: Int
-  flags_not: Int
-  flags_in: [Int]
-  flags_not_in: [Int]
-  flags_gt: Int
-  flags_lt: Int
-  flags_gte: Int
-  flags_lte: Int
-  feeBps: Int
-  feeBps_not: Int
-  feeBps_in: [Int]
-  feeBps_not_in: [Int]
-  feeBps_gt: Int
-  feeBps_lt: Int
-  feeBps_gte: Int
-  feeBps_lte: Int
+  lltv: BigInt
+  lltv_not: BigInt
+  lltv_in: [BigInt]
+  lltv_not_in: [BigInt]
+  lltv_gt: BigInt
+  lltv_lt: BigInt
+  lltv_gte: BigInt
+  lltv_lte: BigInt
   totalSupplyAssets: BigInt
   totalSupplyAssets_not: BigInt
   totalSupplyAssets_in: [BigInt]
@@ -217,6 +182,14 @@ input marketFilter {
   totalBorrowShares_lt: BigInt
   totalBorrowShares_gte: BigInt
   totalBorrowShares_lte: BigInt
+  fee: BigInt
+  fee_not: BigInt
+  fee_in: [BigInt]
+  fee_not_in: [BigInt]
+  fee_gt: BigInt
+  fee_lt: BigInt
+  fee_gte: BigInt
+  fee_lte: BigInt
   lastUpdate: Int
   lastUpdate_not: Int
   lastUpdate_in: [Int]
@@ -233,6 +206,208 @@ input marketFilter {
   createdAt_lt: Int
   createdAt_gte: Int
   createdAt_lte: Int
+  interestAccrued: BigInt
+  interestAccrued_not: BigInt
+  interestAccrued_in: [BigInt]
+  interestAccrued_not_in: [BigInt]
+  interestAccrued_gt: BigInt
+  interestAccrued_lt: BigInt
+  interestAccrued_gte: BigInt
+  interestAccrued_lte: BigInt
+  liquidationCount: Int
+  liquidationCount_not: Int
+  liquidationCount_in: [Int]
+  liquidationCount_not_in: [Int]
+  liquidationCount_gt: Int
+  liquidationCount_lt: Int
+  liquidationCount_gte: Int
+  liquidationCount_lte: Int
+  badDebtAssets: BigInt
+  badDebtAssets_not: BigInt
+  badDebtAssets_in: [BigInt]
+  badDebtAssets_not_in: [BigInt]
+  badDebtAssets_gt: BigInt
+  badDebtAssets_lt: BigInt
+  badDebtAssets_gte: BigInt
+  badDebtAssets_lte: BigInt
+}
+
+type vault {
+  id: String!
+  key: String!
+  asset: String!
+  totalAssets: BigInt!
+  totalShares: BigInt!
+  feeShares: BigInt!
+  depositorCount: Int!
+  updatedAt: Int!
+}
+
+type vaultPage {
+  items: [vault!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input vaultFilter {
+  AND: [vaultFilter]
+  OR: [vaultFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  key: String
+  key_not: String
+  key_in: [String]
+  key_not_in: [String]
+  key_contains: String
+  key_not_contains: String
+  key_starts_with: String
+  key_ends_with: String
+  key_not_starts_with: String
+  key_not_ends_with: String
+  key_contains_nocase: String
+  key_not_contains_nocase: String
+  key_starts_with_nocase: String
+  key_ends_with_nocase: String
+  key_not_starts_with_nocase: String
+  key_not_ends_with_nocase: String
+  asset: String
+  asset_not: String
+  asset_in: [String]
+  asset_not_in: [String]
+  asset_contains: String
+  asset_not_contains: String
+  asset_starts_with: String
+  asset_ends_with: String
+  asset_not_starts_with: String
+  asset_not_ends_with: String
+  totalAssets: BigInt
+  totalAssets_not: BigInt
+  totalAssets_in: [BigInt]
+  totalAssets_not_in: [BigInt]
+  totalAssets_gt: BigInt
+  totalAssets_lt: BigInt
+  totalAssets_gte: BigInt
+  totalAssets_lte: BigInt
+  totalShares: BigInt
+  totalShares_not: BigInt
+  totalShares_in: [BigInt]
+  totalShares_not_in: [BigInt]
+  totalShares_gt: BigInt
+  totalShares_lt: BigInt
+  totalShares_gte: BigInt
+  totalShares_lte: BigInt
+  feeShares: BigInt
+  feeShares_not: BigInt
+  feeShares_in: [BigInt]
+  feeShares_not_in: [BigInt]
+  feeShares_gt: BigInt
+  feeShares_lt: BigInt
+  feeShares_gte: BigInt
+  feeShares_lte: BigInt
+  depositorCount: Int
+  depositorCount_not: Int
+  depositorCount_in: [Int]
+  depositorCount_not_in: [Int]
+  depositorCount_gt: Int
+  depositorCount_lt: Int
+  depositorCount_gte: Int
+  depositorCount_lte: Int
+  updatedAt: Int
+  updatedAt_not: Int
+  updatedAt_in: [Int]
+  updatedAt_not_in: [Int]
+  updatedAt_gt: Int
+  updatedAt_lt: Int
+  updatedAt_gte: Int
+  updatedAt_lte: Int
+}
+
+type vaultAllocation {
+  id: String!
+  vault: String!
+  marketId: String!
+  cap: BigInt!
+  supplied: BigInt!
+  updatedAt: Int!
+}
+
+type vaultAllocationPage {
+  items: [vaultAllocation!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input vaultAllocationFilter {
+  AND: [vaultAllocationFilter]
+  OR: [vaultAllocationFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  id_contains_nocase: String
+  id_not_contains_nocase: String
+  id_starts_with_nocase: String
+  id_ends_with_nocase: String
+  id_not_starts_with_nocase: String
+  id_not_ends_with_nocase: String
+  vault: String
+  vault_not: String
+  vault_in: [String]
+  vault_not_in: [String]
+  vault_contains: String
+  vault_not_contains: String
+  vault_starts_with: String
+  vault_ends_with: String
+  vault_not_starts_with: String
+  vault_not_ends_with: String
+  marketId: String
+  marketId_not: String
+  marketId_in: [String]
+  marketId_not_in: [String]
+  marketId_contains: String
+  marketId_not_contains: String
+  marketId_starts_with: String
+  marketId_ends_with: String
+  marketId_not_starts_with: String
+  marketId_not_ends_with: String
+  cap: BigInt
+  cap_not: BigInt
+  cap_in: [BigInt]
+  cap_not_in: [BigInt]
+  cap_gt: BigInt
+  cap_lt: BigInt
+  cap_gte: BigInt
+  cap_lte: BigInt
+  supplied: BigInt
+  supplied_not: BigInt
+  supplied_in: [BigInt]
+  supplied_not_in: [BigInt]
+  supplied_gt: BigInt
+  supplied_lt: BigInt
+  supplied_gte: BigInt
+  supplied_lte: BigInt
+  updatedAt: Int
+  updatedAt_not: Int
+  updatedAt_in: [Int]
+  updatedAt_not_in: [Int]
+  updatedAt_gt: Int
+  updatedAt_lt: Int
+  updatedAt_gte: Int
+  updatedAt_lte: Int
 }
 
 type position {
@@ -242,6 +417,9 @@ type position {
   supplyShares: BigInt!
   borrowShares: BigInt!
   collateral: BigInt!
+  interestPaid: BigInt!
+  liquidatedCount: Int!
+  openedAt: Int!
   updatedAt: Int!
 }
 
@@ -314,6 +492,30 @@ input positionFilter {
   collateral_lt: BigInt
   collateral_gte: BigInt
   collateral_lte: BigInt
+  interestPaid: BigInt
+  interestPaid_not: BigInt
+  interestPaid_in: [BigInt]
+  interestPaid_not_in: [BigInt]
+  interestPaid_gt: BigInt
+  interestPaid_lt: BigInt
+  interestPaid_gte: BigInt
+  interestPaid_lte: BigInt
+  liquidatedCount: Int
+  liquidatedCount_not: Int
+  liquidatedCount_in: [Int]
+  liquidatedCount_not_in: [Int]
+  liquidatedCount_gt: Int
+  liquidatedCount_lt: Int
+  liquidatedCount_gte: Int
+  liquidatedCount_lte: Int
+  openedAt: Int
+  openedAt_not: Int
+  openedAt_in: [Int]
+  openedAt_not_in: [Int]
+  openedAt_gt: Int
+  openedAt_lt: Int
+  openedAt_gte: Int
+  openedAt_lte: Int
   updatedAt: Int
   updatedAt_not: Int
   updatedAt_in: [Int]
@@ -332,10 +534,9 @@ type txEvent {
   caller: String!
   assets: BigInt!
   shares: BigInt!
-  collateral: BigInt!
   txHash: String!
   blockNumber: BigInt!
-  ts: Int!
+  timestamp: Int!
 }
 
 type txEventPage {
@@ -425,14 +626,6 @@ input txEventFilter {
   shares_lt: BigInt
   shares_gte: BigInt
   shares_lte: BigInt
-  collateral: BigInt
-  collateral_not: BigInt
-  collateral_in: [BigInt]
-  collateral_not_in: [BigInt]
-  collateral_gt: BigInt
-  collateral_lt: BigInt
-  collateral_gte: BigInt
-  collateral_lte: BigInt
   txHash: String
   txHash_not: String
   txHash_in: [String]
@@ -451,14 +644,14 @@ input txEventFilter {
   blockNumber_lt: BigInt
   blockNumber_gte: BigInt
   blockNumber_lte: BigInt
-  ts: Int
-  ts_not: Int
-  ts_in: [Int]
-  ts_not_in: [Int]
-  ts_gt: Int
-  ts_lt: Int
-  ts_gte: Int
-  ts_lte: Int
+  timestamp: Int
+  timestamp_not: Int
+  timestamp_in: [Int]
+  timestamp_not_in: [Int]
+  timestamp_gt: Int
+  timestamp_lt: Int
+  timestamp_gte: Int
+  timestamp_lte: Int
 }
 
 type liquidation {
@@ -467,11 +660,11 @@ type liquidation {
   borrower: String!
   liquidator: String!
   repaidAssets: BigInt!
-  repaidShares: BigInt!
-  seizedCollateral: BigInt!
+  seizedAssets: BigInt!
   badDebtAssets: BigInt!
+  byKeeper: Boolean!
   txHash: String!
-  ts: Int!
+  timestamp: Int!
 }
 
 type liquidationPage {
@@ -537,22 +730,14 @@ input liquidationFilter {
   repaidAssets_lt: BigInt
   repaidAssets_gte: BigInt
   repaidAssets_lte: BigInt
-  repaidShares: BigInt
-  repaidShares_not: BigInt
-  repaidShares_in: [BigInt]
-  repaidShares_not_in: [BigInt]
-  repaidShares_gt: BigInt
-  repaidShares_lt: BigInt
-  repaidShares_gte: BigInt
-  repaidShares_lte: BigInt
-  seizedCollateral: BigInt
-  seizedCollateral_not: BigInt
-  seizedCollateral_in: [BigInt]
-  seizedCollateral_not_in: [BigInt]
-  seizedCollateral_gt: BigInt
-  seizedCollateral_lt: BigInt
-  seizedCollateral_gte: BigInt
-  seizedCollateral_lte: BigInt
+  seizedAssets: BigInt
+  seizedAssets_not: BigInt
+  seizedAssets_in: [BigInt]
+  seizedAssets_not_in: [BigInt]
+  seizedAssets_gt: BigInt
+  seizedAssets_lt: BigInt
+  seizedAssets_gte: BigInt
+  seizedAssets_lte: BigInt
   badDebtAssets: BigInt
   badDebtAssets_not: BigInt
   badDebtAssets_in: [BigInt]
@@ -561,6 +746,10 @@ input liquidationFilter {
   badDebtAssets_lt: BigInt
   badDebtAssets_gte: BigInt
   badDebtAssets_lte: BigInt
+  byKeeper: Boolean
+  byKeeper_not: Boolean
+  byKeeper_in: [Boolean]
+  byKeeper_not_in: [Boolean]
   txHash: String
   txHash_not: String
   txHash_in: [String]
@@ -571,246 +760,25 @@ input liquidationFilter {
   txHash_ends_with: String
   txHash_not_starts_with: String
   txHash_not_ends_with: String
-  ts: Int
-  ts_not: Int
-  ts_in: [Int]
-  ts_not_in: [Int]
-  ts_gt: Int
-  ts_lt: Int
-  ts_gte: Int
-  ts_lte: Int
-}
-
-type accrual {
-  id: String!
-  marketId: String!
-  borrowRate: BigInt!
-  interest: BigInt!
-  feeShares: BigInt!
-  ts: Int!
-}
-
-type accrualPage {
-  items: [accrual!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-input accrualFilter {
-  AND: [accrualFilter]
-  OR: [accrualFilter]
-  id: String
-  id_not: String
-  id_in: [String]
-  id_not_in: [String]
-  id_contains: String
-  id_not_contains: String
-  id_starts_with: String
-  id_ends_with: String
-  id_not_starts_with: String
-  id_not_ends_with: String
-  id_contains_nocase: String
-  id_not_contains_nocase: String
-  id_starts_with_nocase: String
-  id_ends_with_nocase: String
-  id_not_starts_with_nocase: String
-  id_not_ends_with_nocase: String
-  marketId: String
-  marketId_not: String
-  marketId_in: [String]
-  marketId_not_in: [String]
-  marketId_contains: String
-  marketId_not_contains: String
-  marketId_starts_with: String
-  marketId_ends_with: String
-  marketId_not_starts_with: String
-  marketId_not_ends_with: String
-  borrowRate: BigInt
-  borrowRate_not: BigInt
-  borrowRate_in: [BigInt]
-  borrowRate_not_in: [BigInt]
-  borrowRate_gt: BigInt
-  borrowRate_lt: BigInt
-  borrowRate_gte: BigInt
-  borrowRate_lte: BigInt
-  interest: BigInt
-  interest_not: BigInt
-  interest_in: [BigInt]
-  interest_not_in: [BigInt]
-  interest_gt: BigInt
-  interest_lt: BigInt
-  interest_gte: BigInt
-  interest_lte: BigInt
-  feeShares: BigInt
-  feeShares_not: BigInt
-  feeShares_in: [BigInt]
-  feeShares_not_in: [BigInt]
-  feeShares_gt: BigInt
-  feeShares_lt: BigInt
-  feeShares_gte: BigInt
-  feeShares_lte: BigInt
-  ts: Int
-  ts_not: Int
-  ts_in: [Int]
-  ts_not_in: [Int]
-  ts_gt: Int
-  ts_lt: Int
-  ts_gte: Int
-  ts_lte: Int
-}
-
-type feedTick {
-  id: String!
-  aggregator: String!
-  answer: BigInt!
-  updatedAt: Int!
-}
-
-type feedTickPage {
-  items: [feedTick!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-input feedTickFilter {
-  AND: [feedTickFilter]
-  OR: [feedTickFilter]
-  id: String
-  id_not: String
-  id_in: [String]
-  id_not_in: [String]
-  id_contains: String
-  id_not_contains: String
-  id_starts_with: String
-  id_ends_with: String
-  id_not_starts_with: String
-  id_not_ends_with: String
-  id_contains_nocase: String
-  id_not_contains_nocase: String
-  id_starts_with_nocase: String
-  id_ends_with_nocase: String
-  id_not_starts_with_nocase: String
-  id_not_ends_with_nocase: String
-  aggregator: String
-  aggregator_not: String
-  aggregator_in: [String]
-  aggregator_not_in: [String]
-  aggregator_contains: String
-  aggregator_not_contains: String
-  aggregator_starts_with: String
-  aggregator_ends_with: String
-  aggregator_not_starts_with: String
-  aggregator_not_ends_with: String
-  answer: BigInt
-  answer_not: BigInt
-  answer_in: [BigInt]
-  answer_not_in: [BigInt]
-  answer_gt: BigInt
-  answer_lt: BigInt
-  answer_gte: BigInt
-  answer_lte: BigInt
-  updatedAt: Int
-  updatedAt_not: Int
-  updatedAt_in: [Int]
-  updatedAt_not_in: [Int]
-  updatedAt_gt: Int
-  updatedAt_lt: Int
-  updatedAt_gte: Int
-  updatedAt_lte: Int
-}
-
-type stockToken {
-  address: String!
-  symbol: String!
-  totalSupply: BigInt!
-  uiMultiplier: BigInt!
-  oraclePaused: Boolean!
-  updatedAt: Int!
-}
-
-type stockTokenPage {
-  items: [stockToken!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-input stockTokenFilter {
-  AND: [stockTokenFilter]
-  OR: [stockTokenFilter]
-  address: String
-  address_not: String
-  address_in: [String]
-  address_not_in: [String]
-  address_contains: String
-  address_not_contains: String
-  address_starts_with: String
-  address_ends_with: String
-  address_not_starts_with: String
-  address_not_ends_with: String
-  symbol: String
-  symbol_not: String
-  symbol_in: [String]
-  symbol_not_in: [String]
-  symbol_contains: String
-  symbol_not_contains: String
-  symbol_starts_with: String
-  symbol_ends_with: String
-  symbol_not_starts_with: String
-  symbol_not_ends_with: String
-  symbol_contains_nocase: String
-  symbol_not_contains_nocase: String
-  symbol_starts_with_nocase: String
-  symbol_ends_with_nocase: String
-  symbol_not_starts_with_nocase: String
-  symbol_not_ends_with_nocase: String
-  totalSupply: BigInt
-  totalSupply_not: BigInt
-  totalSupply_in: [BigInt]
-  totalSupply_not_in: [BigInt]
-  totalSupply_gt: BigInt
-  totalSupply_lt: BigInt
-  totalSupply_gte: BigInt
-  totalSupply_lte: BigInt
-  uiMultiplier: BigInt
-  uiMultiplier_not: BigInt
-  uiMultiplier_in: [BigInt]
-  uiMultiplier_not_in: [BigInt]
-  uiMultiplier_gt: BigInt
-  uiMultiplier_lt: BigInt
-  uiMultiplier_gte: BigInt
-  uiMultiplier_lte: BigInt
-  oraclePaused: Boolean
-  oraclePaused_not: Boolean
-  oraclePaused_in: [Boolean]
-  oraclePaused_not_in: [Boolean]
-  updatedAt: Int
-  updatedAt_not: Int
-  updatedAt_in: [Int]
-  updatedAt_not_in: [Int]
-  updatedAt_gt: Int
-  updatedAt_lt: Int
-  updatedAt_gte: Int
-  updatedAt_lte: Int
+  timestamp: Int
+  timestamp_not: Int
+  timestamp_in: [Int]
+  timestamp_not_in: [Int]
+  timestamp_gt: Int
+  timestamp_lt: Int
+  timestamp_gte: Int
+  timestamp_lte: Int
 }
 
 type snapshot {
   id: String!
   marketId: String!
-  blockNumber: BigInt!
-  ts: Int!
-  totalSupplyAssets: BigInt!
-  totalBorrowAssets: BigInt!
-  utilizationWad: BigInt!
-  borrowAprWad: BigInt!
-  supplyAprWad: BigInt!
+  timestamp: Int!
+  supplyAssets: BigInt!
+  borrowAssets: BigInt!
+  utilizationBps: Int!
+  borrowRatePerSecond: BigInt!
   price: BigInt!
-  feedPrice: BigInt!
-  twapPrice: BigInt!
-  weekendMode: Boolean!
-  float: BigInt!
-  shortInterestBps: Int!
-  premiumBps: Int!
-  hardToBorrow: Boolean!
 }
 
 type snapshotPage {
@@ -848,62 +816,46 @@ input snapshotFilter {
   marketId_ends_with: String
   marketId_not_starts_with: String
   marketId_not_ends_with: String
-  blockNumber: BigInt
-  blockNumber_not: BigInt
-  blockNumber_in: [BigInt]
-  blockNumber_not_in: [BigInt]
-  blockNumber_gt: BigInt
-  blockNumber_lt: BigInt
-  blockNumber_gte: BigInt
-  blockNumber_lte: BigInt
-  ts: Int
-  ts_not: Int
-  ts_in: [Int]
-  ts_not_in: [Int]
-  ts_gt: Int
-  ts_lt: Int
-  ts_gte: Int
-  ts_lte: Int
-  totalSupplyAssets: BigInt
-  totalSupplyAssets_not: BigInt
-  totalSupplyAssets_in: [BigInt]
-  totalSupplyAssets_not_in: [BigInt]
-  totalSupplyAssets_gt: BigInt
-  totalSupplyAssets_lt: BigInt
-  totalSupplyAssets_gte: BigInt
-  totalSupplyAssets_lte: BigInt
-  totalBorrowAssets: BigInt
-  totalBorrowAssets_not: BigInt
-  totalBorrowAssets_in: [BigInt]
-  totalBorrowAssets_not_in: [BigInt]
-  totalBorrowAssets_gt: BigInt
-  totalBorrowAssets_lt: BigInt
-  totalBorrowAssets_gte: BigInt
-  totalBorrowAssets_lte: BigInt
-  utilizationWad: BigInt
-  utilizationWad_not: BigInt
-  utilizationWad_in: [BigInt]
-  utilizationWad_not_in: [BigInt]
-  utilizationWad_gt: BigInt
-  utilizationWad_lt: BigInt
-  utilizationWad_gte: BigInt
-  utilizationWad_lte: BigInt
-  borrowAprWad: BigInt
-  borrowAprWad_not: BigInt
-  borrowAprWad_in: [BigInt]
-  borrowAprWad_not_in: [BigInt]
-  borrowAprWad_gt: BigInt
-  borrowAprWad_lt: BigInt
-  borrowAprWad_gte: BigInt
-  borrowAprWad_lte: BigInt
-  supplyAprWad: BigInt
-  supplyAprWad_not: BigInt
-  supplyAprWad_in: [BigInt]
-  supplyAprWad_not_in: [BigInt]
-  supplyAprWad_gt: BigInt
-  supplyAprWad_lt: BigInt
-  supplyAprWad_gte: BigInt
-  supplyAprWad_lte: BigInt
+  timestamp: Int
+  timestamp_not: Int
+  timestamp_in: [Int]
+  timestamp_not_in: [Int]
+  timestamp_gt: Int
+  timestamp_lt: Int
+  timestamp_gte: Int
+  timestamp_lte: Int
+  supplyAssets: BigInt
+  supplyAssets_not: BigInt
+  supplyAssets_in: [BigInt]
+  supplyAssets_not_in: [BigInt]
+  supplyAssets_gt: BigInt
+  supplyAssets_lt: BigInt
+  supplyAssets_gte: BigInt
+  supplyAssets_lte: BigInt
+  borrowAssets: BigInt
+  borrowAssets_not: BigInt
+  borrowAssets_in: [BigInt]
+  borrowAssets_not_in: [BigInt]
+  borrowAssets_gt: BigInt
+  borrowAssets_lt: BigInt
+  borrowAssets_gte: BigInt
+  borrowAssets_lte: BigInt
+  utilizationBps: Int
+  utilizationBps_not: Int
+  utilizationBps_in: [Int]
+  utilizationBps_not_in: [Int]
+  utilizationBps_gt: Int
+  utilizationBps_lt: Int
+  utilizationBps_gte: Int
+  utilizationBps_lte: Int
+  borrowRatePerSecond: BigInt
+  borrowRatePerSecond_not: BigInt
+  borrowRatePerSecond_in: [BigInt]
+  borrowRatePerSecond_not_in: [BigInt]
+  borrowRatePerSecond_gt: BigInt
+  borrowRatePerSecond_lt: BigInt
+  borrowRatePerSecond_gte: BigInt
+  borrowRatePerSecond_lte: BigInt
   price: BigInt
   price_not: BigInt
   price_in: [BigInt]
@@ -912,6 +864,66 @@ input snapshotFilter {
   price_lt: BigInt
   price_gte: BigInt
   price_lte: BigInt
+}
+
+type feedTick {
+  id: String!
+  symbol: String!
+  timestamp: Int!
+  feedPrice: BigInt!
+  twapPrice: BigInt!
+  divergenceBps: Int!
+}
+
+type feedTickPage {
+  items: [feedTick!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input feedTickFilter {
+  AND: [feedTickFilter]
+  OR: [feedTickFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  id_contains_nocase: String
+  id_not_contains_nocase: String
+  id_starts_with_nocase: String
+  id_ends_with_nocase: String
+  id_not_starts_with_nocase: String
+  id_not_ends_with_nocase: String
+  symbol: String
+  symbol_not: String
+  symbol_in: [String]
+  symbol_not_in: [String]
+  symbol_contains: String
+  symbol_not_contains: String
+  symbol_starts_with: String
+  symbol_ends_with: String
+  symbol_not_starts_with: String
+  symbol_not_ends_with: String
+  symbol_contains_nocase: String
+  symbol_not_contains_nocase: String
+  symbol_starts_with_nocase: String
+  symbol_ends_with_nocase: String
+  symbol_not_starts_with_nocase: String
+  symbol_not_ends_with_nocase: String
+  timestamp: Int
+  timestamp_not: Int
+  timestamp_in: [Int]
+  timestamp_not_in: [Int]
+  timestamp_gt: Int
+  timestamp_lt: Int
+  timestamp_gte: Int
+  timestamp_lte: Int
   feedPrice: BigInt
   feedPrice_not: BigInt
   feedPrice_in: [BigInt]
@@ -928,36 +940,247 @@ input snapshotFilter {
   twapPrice_lt: BigInt
   twapPrice_gte: BigInt
   twapPrice_lte: BigInt
-  weekendMode: Boolean
-  weekendMode_not: Boolean
-  weekendMode_in: [Boolean]
-  weekendMode_not_in: [Boolean]
-  float: BigInt
-  float_not: BigInt
-  float_in: [BigInt]
-  float_not_in: [BigInt]
-  float_gt: BigInt
-  float_lt: BigInt
-  float_gte: BigInt
-  float_lte: BigInt
-  shortInterestBps: Int
-  shortInterestBps_not: Int
-  shortInterestBps_in: [Int]
-  shortInterestBps_not_in: [Int]
-  shortInterestBps_gt: Int
-  shortInterestBps_lt: Int
-  shortInterestBps_gte: Int
-  shortInterestBps_lte: Int
-  premiumBps: Int
-  premiumBps_not: Int
-  premiumBps_in: [Int]
-  premiumBps_not_in: [Int]
-  premiumBps_gt: Int
-  premiumBps_lt: Int
-  premiumBps_gte: Int
-  premiumBps_lte: Int
-  hardToBorrow: Boolean
-  hardToBorrow_not: Boolean
-  hardToBorrow_in: [Boolean]
-  hardToBorrow_not_in: [Boolean]
+  divergenceBps: Int
+  divergenceBps_not: Int
+  divergenceBps_in: [Int]
+  divergenceBps_not_in: [Int]
+  divergenceBps_gt: Int
+  divergenceBps_lt: Int
+  divergenceBps_gte: Int
+  divergenceBps_lte: Int
+}
+
+type creditScore {
+  id: String!
+  score: Int!
+  borrowVolume: BigInt!
+  interestPaid: BigInt!
+  liquidations: Int!
+  daysActive: Int!
+  updatedAt: Int!
+}
+
+type creditScorePage {
+  items: [creditScore!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input creditScoreFilter {
+  AND: [creditScoreFilter]
+  OR: [creditScoreFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  score: Int
+  score_not: Int
+  score_in: [Int]
+  score_not_in: [Int]
+  score_gt: Int
+  score_lt: Int
+  score_gte: Int
+  score_lte: Int
+  borrowVolume: BigInt
+  borrowVolume_not: BigInt
+  borrowVolume_in: [BigInt]
+  borrowVolume_not_in: [BigInt]
+  borrowVolume_gt: BigInt
+  borrowVolume_lt: BigInt
+  borrowVolume_gte: BigInt
+  borrowVolume_lte: BigInt
+  interestPaid: BigInt
+  interestPaid_not: BigInt
+  interestPaid_in: [BigInt]
+  interestPaid_not_in: [BigInt]
+  interestPaid_gt: BigInt
+  interestPaid_lt: BigInt
+  interestPaid_gte: BigInt
+  interestPaid_lte: BigInt
+  liquidations: Int
+  liquidations_not: Int
+  liquidations_in: [Int]
+  liquidations_not_in: [Int]
+  liquidations_gt: Int
+  liquidations_lt: Int
+  liquidations_gte: Int
+  liquidations_lte: Int
+  daysActive: Int
+  daysActive_not: Int
+  daysActive_in: [Int]
+  daysActive_not_in: [Int]
+  daysActive_gt: Int
+  daysActive_lt: Int
+  daysActive_gte: Int
+  daysActive_lte: Int
+  updatedAt: Int
+  updatedAt_not: Int
+  updatedAt_in: [Int]
+  updatedAt_not_in: [Int]
+  updatedAt_gt: Int
+  updatedAt_lt: Int
+  updatedAt_gte: Int
+  updatedAt_lte: Int
+}
+
+type rebateEpoch {
+  id: String!
+  epoch: Int!
+  root: String
+  totalRebate: BigInt!
+  claimedRebate: BigInt!
+  startedAt: Int!
+  endedAt: Int
+}
+
+type rebateEpochPage {
+  items: [rebateEpoch!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input rebateEpochFilter {
+  AND: [rebateEpochFilter]
+  OR: [rebateEpochFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  id_contains_nocase: String
+  id_not_contains_nocase: String
+  id_starts_with_nocase: String
+  id_ends_with_nocase: String
+  id_not_starts_with_nocase: String
+  id_not_ends_with_nocase: String
+  epoch: Int
+  epoch_not: Int
+  epoch_in: [Int]
+  epoch_not_in: [Int]
+  epoch_gt: Int
+  epoch_lt: Int
+  epoch_gte: Int
+  epoch_lte: Int
+  root: String
+  root_not: String
+  root_in: [String]
+  root_not_in: [String]
+  root_contains: String
+  root_not_contains: String
+  root_starts_with: String
+  root_ends_with: String
+  root_not_starts_with: String
+  root_not_ends_with: String
+  totalRebate: BigInt
+  totalRebate_not: BigInt
+  totalRebate_in: [BigInt]
+  totalRebate_not_in: [BigInt]
+  totalRebate_gt: BigInt
+  totalRebate_lt: BigInt
+  totalRebate_gte: BigInt
+  totalRebate_lte: BigInt
+  claimedRebate: BigInt
+  claimedRebate_not: BigInt
+  claimedRebate_in: [BigInt]
+  claimedRebate_not_in: [BigInt]
+  claimedRebate_gt: BigInt
+  claimedRebate_lt: BigInt
+  claimedRebate_gte: BigInt
+  claimedRebate_lte: BigInt
+  startedAt: Int
+  startedAt_not: Int
+  startedAt_in: [Int]
+  startedAt_not_in: [Int]
+  startedAt_gt: Int
+  startedAt_lt: Int
+  startedAt_gte: Int
+  startedAt_lte: Int
+  endedAt: Int
+  endedAt_not: Int
+  endedAt_in: [Int]
+  endedAt_not_in: [Int]
+  endedAt_gt: Int
+  endedAt_lt: Int
+  endedAt_gte: Int
+  endedAt_lte: Int
+}
+
+type builder {
+  id: String!
+  label: String
+  referredVolume: BigInt!
+  feeEarned: BigInt!
+  updatedAt: Int!
+}
+
+type builderPage {
+  items: [builder!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input builderFilter {
+  AND: [builderFilter]
+  OR: [builderFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  label: String
+  label_not: String
+  label_in: [String]
+  label_not_in: [String]
+  label_contains: String
+  label_not_contains: String
+  label_starts_with: String
+  label_ends_with: String
+  label_not_starts_with: String
+  label_not_ends_with: String
+  label_contains_nocase: String
+  label_not_contains_nocase: String
+  label_starts_with_nocase: String
+  label_ends_with_nocase: String
+  label_not_starts_with_nocase: String
+  label_not_ends_with_nocase: String
+  referredVolume: BigInt
+  referredVolume_not: BigInt
+  referredVolume_in: [BigInt]
+  referredVolume_not_in: [BigInt]
+  referredVolume_gt: BigInt
+  referredVolume_lt: BigInt
+  referredVolume_gte: BigInt
+  referredVolume_lte: BigInt
+  feeEarned: BigInt
+  feeEarned_not: BigInt
+  feeEarned_in: [BigInt]
+  feeEarned_not_in: [BigInt]
+  feeEarned_gt: BigInt
+  feeEarned_lt: BigInt
+  feeEarned_gte: BigInt
+  feeEarned_lte: BigInt
+  updatedAt: Int
+  updatedAt_not: Int
+  updatedAt_in: [Int]
+  updatedAt_not_in: [Int]
+  updatedAt_gt: Int
+  updatedAt_lt: Int
+  updatedAt_gte: Int
+  updatedAt_lte: Int
 }

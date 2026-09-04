@@ -22,7 +22,22 @@ export default createConfig({
   chains: {
     robinhood: {
       id: 4663,
-      rpc: process.env.PONDER_RPC_URL_4663!,
+      /**
+       * Ponder gets the PUBLIC node, and only the public node.
+       *
+       * It serves eth_getLogs over tens of thousands of blocks without rate-limiting, which is what
+       * following a chain that produces a block every 214 ms needs; Alchemy's free tier caps the
+       * same call at TEN blocks and 429s under load, so the backfill never finishes there. Listing
+       * both is worse than either: Ponder spreads requests across the list, so a wide sweep lands
+       * on Alchemy every other time and takes the process down with it.
+       *
+       * The public node is pruned, so historical state cannot come from here — src/snapshot.ts
+       * holds its own archive client for that, and the routing is explicit rather than hoped for.
+       */
+      rpc: process.env.PONDER_LOGS_RPC ?? "https://rpc.mainnet.chain.robinhood.com",
+      ethGetLogsBlockRange: Number(process.env.LOG_CHUNK ?? 10_000),
+      maxRequestsPerSecond: Number(process.env.MAX_RPS ?? 20),
+      pollingInterval: Number(process.env.POLLING_MS ?? 2000),
     },
   },
   contracts: {

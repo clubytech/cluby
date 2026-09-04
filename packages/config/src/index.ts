@@ -426,6 +426,7 @@ export const deployments: {
    * it holds nothing, so replacing it costs a deploy and nothing else.
    */
   flashLiquidator: "0x91B3c5b8C76386A8293B1CE97fE8dceB10733F5B",
+  leverageRouter: "0xBF6cdE3F772cB3939dFCc313AA4E83C3452bab6B",
   owner: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
   /** Block of the first Cluby deploy — where the indexer starts. */
   startBlock: 54451901,
