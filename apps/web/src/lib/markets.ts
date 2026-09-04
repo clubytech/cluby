@@ -49,6 +49,9 @@ export type MarketView = {
   priceAge: number | null;
   priceStale: boolean;
   supplyCapUsd: number;
+  /** Soft-liquidation instance, when one exists. Opt-in: it can do nothing until the borrower
+   * authorises it on Morpho. */
+  preLiquidation: `0x${string}` | null;
   totalSupplyUsd: number;
   totalBorrowUsd: number;
   liquidityUsd: number;
@@ -139,6 +142,7 @@ async function readMarkets(): Promise<MarketView[]> {
         priceAge: age,
         priceStale: source === "chainlink" && age !== null && age > maxAgeOf(m),
         supplyCapUsd: m.supplyCapUsd,
+        preLiquidation: (deployments.preLiquidations?.[m.key] ?? null) as `0x${string}` | null,
         marketId,
       };
 

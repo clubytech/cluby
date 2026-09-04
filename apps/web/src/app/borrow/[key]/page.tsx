@@ -114,7 +114,9 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
                   ],
                   [
                     "Soft liquidation",
-                    `Available: partial unwind between ${pct(market.lltv - 0.05, 1)} and ${pct(market.lltv, 1)} LTV at a 2–4% penalty instead of the full liquidation incentive.`,
+                    market.preLiquidation
+                      ? `${market.preLiquidation} — opt in, and between ${pct(market.lltv - 0.05, 1)} and ${pct(market.lltv, 1)} LTV the position is trimmed at a 2–4% penalty instead of the full ~12.7% incentive.`
+                      : "Not deployed on this market yet. It costs a deploy and takes nothing away from anyone, so it follows the liquidity.",
                   ],
                 ].map(([l, v]) => (
                   <div key={l} className="flex flex-col gap-1 border-b border-line pb-3 last:border-0 sm:flex-row sm:justify-between sm:gap-8">

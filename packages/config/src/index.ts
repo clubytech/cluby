@@ -207,7 +207,8 @@ export const morpho = {
   metaMorphoFactory: { address: "0xD371727A6F3c5033204b6E4D5548EF4Ad40C9E20", verified: true },
   vaultV2Factory: { address: null, verified: false },
   bundler3: { address: null, verified: false },
-  preLiquidationFactory: { address: null, verified: false },
+  /** Not deployed by Morpho here either; deployed from their sources at commit a9ef88fe. */
+  preLiquidationFactory: { address: "0xe57CC1F0ED5E760D2EcAaa04a1E0d1c690daAa0e", verified: true },
   publicAllocator: { address: null, verified: false },
 } as const;
 
@@ -413,6 +414,8 @@ export const deployments: {
   merkleDistributor?: `0x${string}`;
   creditRegistry?: `0x${string}`;
   metaMorphoFactory?: `0x${string}`;
+  preLiquidationFactory?: `0x${string}`;
+  preLiquidations?: Record<string, `0x${string}`>;
   owner?: `0x${string}`;
   startBlock?: number;
   vaults: Record<string, `0x${string}`>;
@@ -431,6 +434,18 @@ export const deployments: {
   /** Block of the first Cluby deploy — where the indexer starts. */
   startBlock: 54451901,
   metaMorphoFactory: "0xD371727A6F3c5033204b6E4D5548EF4Ad40C9E20",
+  preLiquidationFactory: "0xe57CC1F0ED5E760D2EcAaa04a1E0d1c690daAa0e",
+  /**
+   * Soft liquidation, per market. A borrower must authorise the instance on Morpho for anything to
+   * happen — deploying one takes nothing away from anyone, it only makes the gentler path
+   * available. Created for the markets the vault actually funds; the rest cost ~1.5M gas each and
+   * can be added when they have liquidity.
+   */
+  preLiquidations: {
+    NVDA: "0x93d97F5C84a85857965c0341289D246E25ce72De",
+    SPY: "0x7A0A8B48FDcf7577A04F08D113aB40aD9E7d417e",
+    ETH: "0x9c5bca1Cc5aC228bC60c63817A1E1c95e43A2098",
+  } as Record<string, `0x${string}`>,
   vaults: {
     "core-usdg": "0x97e813828B0250dCa5c05FF2567dfD616E5b3C61",
   },

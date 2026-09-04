@@ -77,3 +77,19 @@ remappings = [
   "forge-std/=lib/forge-std/src/",
   "lib/metamorpho-v1.1/lib/openzeppelin-contracts/=lib/openzeppelin-contracts/",
 ]
+
+[profile.preliq.lint]
+lint_on_build = false
+
+# Morpho's pre-liquidation sources, vendored from morpho-org/pre-liquidation @ a9ef88fe. They pin
+# `pragma solidity 0.8.27`, which cannot share a compilation unit with the tree's 0.8.28.
+[profile.preliq]
+solc_version = "0.8.27"
+# Morpho builds these with the IR pipeline; the legacy codegen cannot fit PreLiquidation's locals.
+via_ir = true
+optimizer_runs = 200
+skip = ["src/**", "test/unit/**", "test/fork/MorphoStack*", "test/fork/Leverage*", "test/fork/Vault*", "test/mocks/**", "script/CreateMarkets*", "script/DeployCore*", "script/SeedMarket*", "script/SetupForkMarket*", "script/DeployVaultFactory*", "script/CreateVault*"]
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/",
+]

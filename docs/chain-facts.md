@@ -160,3 +160,10 @@ Morpho's Chainlink factory prices the feed, not the token, so SGOV's `uiMultipli
 applied: the market values the collateral at the bare feed price, about 0.5% below what the token
 is actually worth. That is the safe direction — collateral is understated, never overstated — but
 the gap grows as the multiplier does, so it needs a composed oracle before SGOV's cap is raised.
+
+### The RPC returns wrong answers under load, silently
+Twice during deployment a single `eth_getBalance` came back as zero and a `price()` call as empty,
+on both the archive and the public endpoint, with no error — and both were correct on an immediate
+retry. Anything recorded from one unverified read can therefore be wrong in a way nothing downstream
+will catch: market ids, oracle addresses and balances are all read twice or cross-checked against a
+second source before being written into `packages/config`.
