@@ -1,18 +1,18 @@
 /**
  * Writes contracts/config/markets.json from the TypeScript catalog, so the deploy scripts and the
  * app cannot disagree about which markets exist or what their parameters are. Run before deploying:
- *   node packages/config/scripts/export-markets.mjs
+ *   pnpm export:markets
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const { marketCatalog, stocks, nativeTokens, tokens, external, morpho, LLTV, vaultCatalog } = await import(
-  join(root, "packages/config/src/index.ts")
-);
+const { marketCatalog, stocks, nativeTokens, tokens, external, morpho, LLTV, vaultCatalog, deployments } =
+  await import(join(root, "packages/config/src/index.ts"));
 
 const ZERO = "0x0000000000000000000000000000000000000000";
+const ZERO_ID = `0x${"0".repeat(64)}`;
 
 const addressOf = (symbol) =>
   tokens[symbol]?.address ?? stocks[symbol]?.address ?? nativeTokens[symbol]?.address ?? null;
@@ -43,6 +43,12 @@ const markets = marketCatalog
       supplyCapUsd: m.supplyCapUsd,
       collateralDecimals: m.collateral === "USDG" ? 6 : 18,
       loanDecimals: m.loan === "USDG" ? 6 : 18,
+      /**
+       * Already on chain. The deploy script checks this BEFORE it builds an oracle: Morpho's
+       * factory salts by market key, so a second run collides on CREATE2 and reverts the whole
+       * batch instead of skipping the one market it had already created.
+       */
+      deployedId: deployments.markets[m.key]?.id ?? ZERO_ID,
     };
   })
   .filter((m) => m.collateralToken && m.loanToken);

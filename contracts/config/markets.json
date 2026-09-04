@@ -23,7 +23,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x639f19732ce4cd54b9f3509f3acee6e8d5d20ff5e75b7c94c20808f48196d826"
     },
     {
       "key": "SPY",
@@ -40,7 +41,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xf95832e36d9d8baf35eb78ce80cbed92d20198ba639659b3f9a2ab00ced0a0c1"
     },
     {
       "key": "AAPL",
@@ -57,7 +59,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x349f46c4c49ff76074e27a21fe49fd86511b06c764a6d46589ced02a40dc40d2"
     },
     {
       "key": "TSLA",
@@ -74,7 +77,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 1000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xf7e15b56bbb99e7b600032a4285e34b59953cbc42361367407f3c5966fd54478"
     },
     {
       "key": "ETH",
@@ -91,7 +95,8 @@
       "lltv": "770000000000000000",
       "supplyCapUsd": 5000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x6722f53f25a8d6e73493893c4f7f80ddc535cf97c4a93116fd55296e714216ae"
     },
     {
       "key": "HIMS",
@@ -108,7 +113,8 @@
       "lltv": "385000000000000000",
       "supplyCapUsd": 500,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xf9566d437f9ad34df3084aea5866d2765d5afb519b619ec3b9b2c2c4c1221bc8"
     },
     {
       "key": "SPCX",
@@ -125,7 +131,8 @@
       "lltv": "385000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xba5b95d86b3220d2ac264d30575e53d647472629d8febc117f4155666961b40c"
     },
     {
       "key": "PONS",
@@ -142,7 +149,8 @@
       "lltv": "385000000000000000",
       "supplyCapUsd": 5000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x802aecb45c6701afc9dc8bfc46c94fdf113f96bf220444907155b1bdaa80c7b3"
     },
     {
       "key": "CASHCAT",
@@ -159,7 +167,8 @@
       "lltv": "385000000000000000",
       "supplyCapUsd": 1000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xb32df78a9ad7f3d6dfe451833567288493a8d6d1551fec18b0554a0759b253f8"
     },
     {
       "key": "MSFT",
@@ -176,7 +185,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x7460c76e24436a2a187be2c584cdc84c01b6014e7704fb414744e4ce0456ca9d"
     },
     {
       "key": "GOOGL",
@@ -193,7 +203,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x35bc0628f10ba7e29cda1787ad9af465092b112ef409ab0dad857c4f53341c61"
     },
     {
       "key": "AMZN",
@@ -210,7 +221,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x7e375e21ade5caf251eef3e820bf8eda0e08f1378fe4aaedad7ead437be3e0e1"
     },
     {
       "key": "META",
@@ -227,7 +239,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 1000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0x52a696df717bed55532a0cb16490cbe45b23f44e0bf4a4761968c9aa43fc4377"
     },
     {
       "key": "QQQ",
@@ -244,7 +257,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xdcb03716ad496e58390fb5c5d8b1f0a196f0b923482f17a3c231390a39e9fb67"
     },
     {
       "key": "SGOV",
@@ -261,7 +275,8 @@
       "lltv": "860000000000000000",
       "supplyCapUsd": 2000,
       "collateralDecimals": 18,
-      "loanDecimals": 6
+      "loanDecimals": 6,
+      "deployedId": "0xb416b784f4925f4885ca1fa7d4a1469a10f300d6525bbe23411d62f711d991cc"
     },
     {
       "key": "NVDA-SHORT",
@@ -278,7 +293,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 1000,
       "collateralDecimals": 6,
-      "loanDecimals": 18
+      "loanDecimals": 18,
+      "deployedId": "0xfa02b9d58bb338ea1ac14d89c2586683bf7c209b60073662a7c0dfaa72078be1"
     },
     {
       "key": "TSLA-SHORT",
@@ -295,7 +311,8 @@
       "lltv": "625000000000000000",
       "supplyCapUsd": 1000,
       "collateralDecimals": 6,
-      "loanDecimals": 18
+      "loanDecimals": 18,
+      "deployedId": "0xdfc64ba716c6b04aed5d182b87f218da60908bf17129cabef0ffc9bffe65acc2"
     }
   ],
   "vaults": [

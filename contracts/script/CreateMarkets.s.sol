@@ -64,6 +64,15 @@ contract CreateMarkets is Script {
         string memory key = json.readString(string.concat(at, ".key"));
         if (!_selected(only, key)) return;
 
+        // Skip before touching the oracle factory, not after. The factory salts by market key, so
+        // building an oracle for a market that already exists collides on CREATE2 and reverts the
+        // whole run — the batch would die on the first market it had already made.
+        Id recorded = Id.wrap(json.readBytes32(string.concat(at, ".deployedId")));
+        if (Id.unwrap(recorded) != bytes32(0) && morpho.idToMarketParams(recorded).lltv != 0) {
+            console2.log(key, "already created");
+            return;
+        }
+
         MarketParams memory params = MarketParams({
             loanToken: json.readAddress(string.concat(at, ".loanToken")),
             collateralToken: json.readAddress(string.concat(at, ".collateralToken")),
