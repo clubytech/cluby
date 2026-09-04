@@ -29,6 +29,24 @@ BOR_UNITS=$(python3 -c "print(int($BORROW * 10**6))")
 export ETH_RPC_URL="$ROBINHOOD_RPC_URL"
 say() { printf "\n\033[1m==> %s\033[0m\n" "$1"; }
 
+# This node intermittently refuses to estimate — it has already been caught returning a zero
+# balance and an empty price under load, and it rejects a transaction that costs 0.00002 ETH from
+# an account holding 0.0147 as "insufficient funds". So the gas is stated outright rather than
+# asked for, and a refusal is retried instead of ending the run.
+send() {
+  local label="$1"; shift
+  for attempt in 1 2 3; do
+    if out=$(cast send "$@" --private-key "$PRIVATE_KEY" --gas-limit 300000 --gas-price 2gwei 2>&1); then
+      return 0
+    fi
+    echo "  $label: attempt $attempt failed — $(echo "$out" | grep -oE 'error code [-0-9]+: .*' | head -1)"
+    sleep 3
+  done
+  echo "  $label: giving up"
+  echo "$out" | tail -3
+  return 1
+}
+
 say "Before"
 python3 - "$(cast call $USDG 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" \
           "$(cast call $NVDA 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" <<'PY'
@@ -38,19 +56,19 @@ print(f"  wallet {u/1e6:,.2f} USDG · {n/1e18:.6f} NVDA")
 PY
 
 say "1/4  approve the vault for $DEPOSIT USDG"
-cast send "$USDG" "approve(address,uint256)" "$VAULT" "$DEP_UNITS" --private-key "$PRIVATE_KEY" >/dev/null
+send "approve vault" "$USDG" "approve(address,uint256)" "$VAULT" "$DEP_UNITS" >/dev/null
 say "2/4  deposit $DEPOSIT USDG"
-cast send "$VAULT" "deposit(uint256,address)" "$DEP_UNITS" "$DEPLOYER" --private-key "$PRIVATE_KEY" >/dev/null
+send "deposit" "$VAULT" "deposit(uint256,address)" "$DEP_UNITS" "$DEPLOYER" >/dev/null
 echo "  vault now holds $(cast call $VAULT 'totalAssets()(uint256)' | awk '{printf "%.2f", $1/1e6}') USDG"
 
 say "3/4  approve Morpho for $COLLATERAL NVDA"
-cast send "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS" --private-key "$PRIVATE_KEY" >/dev/null
+send "approve Morpho" "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS" >/dev/null
 
 say "4/4  post collateral and borrow $BORROW USDG"
 MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
   FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
-  --rpc-url "$ROBINHOOD_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast \
-  --root contracts 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
+  --rpc-url "$ROBINHOOD_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast --slow \
+  --with-gas-price 2gwei --root contracts 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
 
 say "After"
 python3 - "$(cast call $USDG 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" \
