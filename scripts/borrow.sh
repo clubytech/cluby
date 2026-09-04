@@ -21,6 +21,10 @@ BORROW=${BORROW:-35}
 COL_UNITS=$(python3 -c "print(int($COLLATERAL * 10**18))")
 BOR_UNITS=$(python3 -c "print(int($BORROW * 10**6))")
 
+# The base fee on this chain has moved between 0.4 and 10 gwei within an hour, so a hard-coded
+# price is a transaction that either overpays or is rejected outright with "max fee per gas less
+# than block base fee". Take the current one and double it.
+gas_price() { python3 -c "print(int($(cast base-fee) * 2))"; }
 export ETH_RPC_URL="$RPC"
 
 # The key is read here and never crosses a shell prompt.
@@ -32,7 +36,7 @@ ALLOWANCE=$(cast call "$NVDA" "allowance(address,address)(uint256)" "$FROM" "$MO
 if [ "$(python3 -c "print(1 if $ALLOWANCE < $COL_UNITS else 0)")" = "1" ]; then
   echo "approving Morpho for $COLLATERAL NVDA"
   cast send "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS" \
-    --private-key "$PRIVATE_KEY" --gas-limit 200000 --gas-price 2gwei >/dev/null
+    --private-key "$PRIVATE_KEY" --gas-limit 200000 --gas-price "$(gas_price)" >/dev/null
 else
   echo "Morpho already approved for $(python3 -c "print($ALLOWANCE/1e18)") NVDA"
 fi
@@ -41,5 +45,5 @@ echo "posting $COLLATERAL NVDA and borrowing $BORROW USDG"
 cd contracts
 MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
 FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
-  --rpc-url "$RPC" --private-key "$PRIVATE_KEY" --broadcast --slow --with-gas-price 2gwei 2>&1 |
+  --rpc-url "$RPC" --private-key "$PRIVATE_KEY" --broadcast --slow --with-gas-price "$(gas_price)" 2>&1 |
   grep -E "collateral posted|borrowed|health factor|liquidation price|collateral value|debt |Error|revert" || true

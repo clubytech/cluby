@@ -32,6 +32,10 @@ BOR_UNITS=$(python3 -c "print(int($BORROW * 10**6))")
 # with the indexer, the site and the keeper, all of which poll it continuously. When its budget runs
 # out the symptoms are timeouts and an estimator claiming an account with 0.0145 ETH cannot afford
 # a 0.00002 ETH transaction. The public node has neither limit for what this script does.
+# The base fee on this chain has moved between 0.4 and 10 gwei within an hour, so a hard-coded
+# price is a transaction that either overpays or is rejected outright with "max fee per gas less
+# than block base fee". Take the current one and double it.
+gas_price() { python3 -c "print(int($(cast base-fee) * 2))"; }
 export ETH_RPC_URL="${CANARY_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}"
 say() { printf "\n\033[1m==> %s\033[0m\n" "$1"; }
 
@@ -45,7 +49,7 @@ send() {
     # The limit is a ceiling, not a charge: unused gas is never billed, so it is set generously.
     # A deposit that allocates into a market costs ~354k, and the 300k this script first used ran
     # out of gas — which looks exactly like a revert unless you read the receipt.
-    if out=$(cast send "$@" --private-key "$PRIVATE_KEY" --gas-limit 1500000 --gas-price 2gwei 2>&1); then
+    if out=$(cast send "$@" --private-key "$PRIVATE_KEY" --gas-limit 1500000 --gas-price "$(gas_price)" 2>&1); then
       if echo "$out" | grep -q "status *1"; then
         return 0
       fi
@@ -82,7 +86,7 @@ say "4/4  post collateral and borrow $BORROW USDG"
 (cd contracts && MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
   FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
   --rpc-url "$ETH_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast --slow \
-  --with-gas-price 2gwei) 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
+  --with-gas-price "$(gas_price)") 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
 
 say "After"
 python3 - "$(cast call $USDG 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" \
