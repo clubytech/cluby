@@ -20,6 +20,30 @@ export async function getBuilders(): Promise<BuilderRow[] | null> {
   }
 }
 
+export type Points = { supplyPoints: number; borrowPoints: number; updatedAt: number | null };
+
+/**
+ * Season One points for one address. The indexer stores size-times-time and adds the time since the
+ * last touch on read, so a position left alone keeps earning.
+ */
+export async function getPoints(address: string): Promise<Points | null> {
+  if (!INDEXER) return null;
+  try {
+    const r = await fetch(`${INDEXER}/points/${address}`, { next: { revalidate: 30 } });
+    if (!r.ok) return null;
+    const d = (await r.json()) as { supplyPoints: string; borrowPoints: string; updatedAt: number | null };
+    // Unit-seconds are enormous; a day of one whole unit is the readable unit to show.
+    const perDay = 1e18 * 86_400;
+    return {
+      supplyPoints: Number(d.supplyPoints) / perDay,
+      borrowPoints: Number(d.borrowPoints) / perDay,
+      updatedAt: d.updatedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export type Snapshot = {
   timestamp: number;
   supplyAssets: number;

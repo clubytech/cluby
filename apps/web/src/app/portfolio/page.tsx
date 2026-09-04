@@ -1,6 +1,7 @@
 import { SectionHeading, Card, Badge } from "@/components/ui";
 import { getProtocolStats } from "@/lib/markets";
 import { getPortfolio } from "@/lib/portfolio";
+import { getPoints } from "@/lib/series";
 import { pct, usd } from "@/lib/format";
 import { AddressForm } from "@/components/address-form";
 
@@ -15,9 +16,10 @@ export default async function PortfolioPage({
   const { address } = await searchParams;
   const valid = address && /^0x[a-fA-F0-9]{40}$/.test(address) ? (address as `0x${string}`) : null;
 
-  const [stats, portfolio] = await Promise.all([
+  const [stats, portfolio, points] = await Promise.all([
     getProtocolStats(),
     valid ? getPortfolio(valid) : Promise.resolve(null),
+    valid ? getPoints(valid) : Promise.resolve(null),
   ]);
 
   return (
@@ -138,7 +140,33 @@ export default async function PortfolioPage({
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card>
+              <p className="num text-[11px] uppercase tracking-widest text-text-soft">Season One points</p>
+              {points ? (
+                <>
+                  <div className="mt-3 flex gap-8">
+                    <div>
+                      <p className="num text-2xl">{points.supplyPoints.toFixed(2)}</p>
+                      <p className="text-xs text-text-soft">supplying</p>
+                    </div>
+                    <div>
+                      <p className="num text-2xl">{points.borrowPoints.toFixed(2)}</p>
+                      <p className="text-xs text-text-soft">borrowing</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-text-soft">
+                    Size multiplied by time held. They accrue while you do nothing, and there is no
+                    promised conversion rate — a season that quietly names a price before it has
+                    earnings to pay it is making a promise out of someone else&apos;s money.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 text-sm leading-relaxed text-text-soft">
+                  Size multiplied by time held, counted off chain. Nothing to show for this address yet.
+                </p>
+              )}
+            </Card>
             <Card>
               <p className="num text-[11px] uppercase tracking-widest text-text-soft">Rebates</p>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">

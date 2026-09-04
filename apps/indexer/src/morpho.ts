@@ -2,7 +2,7 @@ import { ponder } from "ponder:registry";
 import { market, position, txEvent, liquidation } from "ponder:schema";
 import { marketCatalog, deployments } from "@cluby/config";
 import { referrerFromCalldata } from "@cluby/sdk";
-import { builder } from "ponder:schema";
+import { builder, points } from "ponder:schema";
 
 /** Reverse the deploy record so an id can name itself in the API. */
 const keyOf = (id: string) =>
@@ -12,6 +12,39 @@ const keyOf = (id: string) =>
 
 const positionId = (marketId: string, user: string) => `${marketId}-${user.toLowerCase()}`;
 const eventId = (hash: string, logIndex: number) => `${hash}-${logIndex}`;
+
+/**
+ * Accrue points for the time that has passed at the sizes the user has been holding, then record
+ * their new sizes. Called before a position changes, so what accrues is what was actually held.
+ */
+async function accruePoints(
+  context: any,
+  user: `0x${string}`,
+  ts: number,
+  nextSupply: bigint,
+  nextBorrow: bigint,
+) {
+  const existing = await context.db.find(points, { id: user });
+  if (!existing) {
+    await context.db.insert(points).values({
+      id: user,
+      supplyUnitSeconds: 0n,
+      borrowUnitSeconds: 0n,
+      supplyAssets: nextSupply,
+      borrowAssets: nextBorrow,
+      updatedAt: ts,
+    });
+    return;
+  }
+  const elapsed = BigInt(Math.max(0, ts - existing.updatedAt));
+  await context.db.update(points, { id: user }).set((row: any) => ({
+    supplyUnitSeconds: row.supplyUnitSeconds + row.supplyAssets * elapsed,
+    borrowUnitSeconds: row.borrowUnitSeconds + row.borrowAssets * elapsed,
+    supplyAssets: nextSupply,
+    borrowAssets: nextBorrow,
+    updatedAt: ts,
+  }));
+}
 
 /** A position row is created on first touch and updated in place after that. */
 async function touchPosition(
@@ -24,6 +57,12 @@ async function touchPosition(
 ) {
   const id = positionId(marketId, user);
   const existing = await context.db.find(position, { id });
+
+  // Sizes after this change, in shares — enough for a relative score, which is all points are.
+  const nextSupply = (existing?.supplyShares ?? 0n) + (delta ? (patch.supplyShares ?? 0n) : 0n);
+  const nextBorrow = (existing?.borrowShares ?? 0n) + (delta ? (patch.borrowShares ?? 0n) : 0n);
+  await accruePoints(context, user, timestamp, nextSupply > 0n ? nextSupply : 0n, nextBorrow > 0n ? nextBorrow : 0n);
+
   if (!existing) {
     await context.db.insert(position).values({
       id,

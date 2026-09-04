@@ -150,6 +150,24 @@ export const rebateEpoch = onchainTable("rebate_epoch", (t) => ({
   endedAt: t.integer(),
 }));
 
+/**
+ * Season One points: size multiplied by time, accumulated per user.
+ *
+ * Stored as "unit-seconds" rather than a score, because the accrual is continuous and the position
+ * only moves when someone touches it. The API adds the time since the last touch on read, so a
+ * user who does nothing for a month still sees their points grow — and nothing has to walk every
+ * account on a timer to make that true.
+ */
+export const points = onchainTable("points", (t) => ({
+  id: t.hex().primaryKey(), // user
+  supplyUnitSeconds: t.bigint().notNull(),
+  borrowUnitSeconds: t.bigint().notNull(),
+  /** Sizes at the last touch, so the API can extrapolate from here. */
+  supplyAssets: t.bigint().notNull(),
+  borrowAssets: t.bigint().notNull(),
+  updatedAt: t.integer().notNull(),
+}));
+
 export const builder = onchainTable("builder", (t) => ({
   id: t.hex().primaryKey(),
   label: t.text(),

@@ -14,6 +14,8 @@ const sections = [
   ["liquidations", "Liquidations"],
   ["multiply", "Multiply"],
   ["credit-scores", "Credit scores"],
+  ["points", "Points"],
+  ["builders", "Builders"],
   ["flash-loans", "Flash loans"],
   ["mcp", "MCP and API"],
   ["faq", "FAQ"],
@@ -138,6 +140,32 @@ export default async function DocsPage() {
                 stay healthy, whether they are topped up before trouble, how often they get liquidated.
                 A good score buys a better rebate — never a higher LTV, because the LTV is what protects
                 the lenders.
+              </p>
+            </Doc>
+
+            <Doc id="points" title="Points">
+              <p>
+                Season One counts size multiplied by time: a hundred dollars supplied for ten days
+                and a thousand for one day are worth the same. They accrue while you do nothing, and
+                they are counted off chain by the indexer.
+              </p>
+              <p>
+                There is no promised conversion rate, and that is deliberate. A season that names a
+                price before there are earnings to pay it is making a promise out of money the
+                protocol does not have yet.
+              </p>
+            </Doc>
+
+            <Doc id="builders" title="Builders">
+              <p>
+                An app that routes volume here appends its address as twenty bytes at the end of the
+                call. Solidity ignores bytes past the arguments it expects, so it costs only calldata
+                gas and changes nothing about how the transaction runs — no contract of ours sits in
+                the path of your users&apos; deposits to collect a statistic.
+              </p>
+              <p>
+                A suffix is a claim, not a proof: anyone can append any address to their own
+                transaction. What is paid is settled against the registered list.
               </p>
             </Doc>
 

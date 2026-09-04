@@ -42,6 +42,8 @@ type Query {
   creditScores(where: creditScoreFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): creditScorePage!
   rebateEpoch(id: String!): rebateEpoch
   rebateEpochs(where: rebateEpochFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): rebateEpochPage!
+  points(id: String!): points
+  pointss(where: pointsFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): pointsPage!
   builder(id: String!): builder
   builders(where: builderFilter, orderBy: String, orderDirection: String, before: String, after: String, limit: Int, offset: Int): builderPage!
   _meta: Meta
@@ -1114,6 +1116,76 @@ input rebateEpochFilter {
   endedAt_lt: Int
   endedAt_gte: Int
   endedAt_lte: Int
+}
+
+type points {
+  id: String!
+  supplyUnitSeconds: BigInt!
+  borrowUnitSeconds: BigInt!
+  supplyAssets: BigInt!
+  borrowAssets: BigInt!
+  updatedAt: Int!
+}
+
+type pointsPage {
+  items: [points!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input pointsFilter {
+  AND: [pointsFilter]
+  OR: [pointsFilter]
+  id: String
+  id_not: String
+  id_in: [String]
+  id_not_in: [String]
+  id_contains: String
+  id_not_contains: String
+  id_starts_with: String
+  id_ends_with: String
+  id_not_starts_with: String
+  id_not_ends_with: String
+  supplyUnitSeconds: BigInt
+  supplyUnitSeconds_not: BigInt
+  supplyUnitSeconds_in: [BigInt]
+  supplyUnitSeconds_not_in: [BigInt]
+  supplyUnitSeconds_gt: BigInt
+  supplyUnitSeconds_lt: BigInt
+  supplyUnitSeconds_gte: BigInt
+  supplyUnitSeconds_lte: BigInt
+  borrowUnitSeconds: BigInt
+  borrowUnitSeconds_not: BigInt
+  borrowUnitSeconds_in: [BigInt]
+  borrowUnitSeconds_not_in: [BigInt]
+  borrowUnitSeconds_gt: BigInt
+  borrowUnitSeconds_lt: BigInt
+  borrowUnitSeconds_gte: BigInt
+  borrowUnitSeconds_lte: BigInt
+  supplyAssets: BigInt
+  supplyAssets_not: BigInt
+  supplyAssets_in: [BigInt]
+  supplyAssets_not_in: [BigInt]
+  supplyAssets_gt: BigInt
+  supplyAssets_lt: BigInt
+  supplyAssets_gte: BigInt
+  supplyAssets_lte: BigInt
+  borrowAssets: BigInt
+  borrowAssets_not: BigInt
+  borrowAssets_in: [BigInt]
+  borrowAssets_not_in: [BigInt]
+  borrowAssets_gt: BigInt
+  borrowAssets_lt: BigInt
+  borrowAssets_gte: BigInt
+  borrowAssets_lte: BigInt
+  updatedAt: Int
+  updatedAt_not: Int
+  updatedAt_in: [Int]
+  updatedAt_not_in: [Int]
+  updatedAt_gt: Int
+  updatedAt_lt: Int
+  updatedAt_gte: Int
+  updatedAt_lte: Int
 }
 
 type builder {

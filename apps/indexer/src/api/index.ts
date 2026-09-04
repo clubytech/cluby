@@ -102,6 +102,44 @@ app.get("/builders", async (c) => {
   return reply(c, rows);
 });
 
+/**
+ * Points for one address. Stored accrual plus the time since the last touch, so a position left
+ * alone keeps earning without anything having to sweep every account on a timer.
+ */
+app.get("/points/:address", async (c) => {
+  const address = c.req.param("address").toLowerCase() as `0x${string}`;
+  const [row] = await db.select().from(schema.points).where(eq(schema.points.id, address));
+  if (!row) return reply(c, { address, supplyPoints: "0", borrowPoints: "0", updatedAt: null });
+
+  const now = Math.floor(Date.now() / 1000);
+  const elapsed = BigInt(Math.max(0, now - row.updatedAt));
+  return reply(c, {
+    address,
+    supplyPoints: row.supplyUnitSeconds + row.supplyAssets * elapsed,
+    borrowPoints: row.borrowUnitSeconds + row.borrowAssets * elapsed,
+    updatedAt: row.updatedAt,
+    accruingAt: { supply: row.supplyAssets, borrow: row.borrowAssets },
+  });
+});
+
+app.get("/points", async (c) => {
+  const rows = await db.select().from(schema.points).limit(500);
+  const now = Math.floor(Date.now() / 1000);
+  return reply(
+    c,
+    rows
+      .map((r) => {
+        const elapsed = BigInt(Math.max(0, now - r.updatedAt));
+        return {
+          address: r.id,
+          supplyPoints: r.supplyUnitSeconds + r.supplyAssets * elapsed,
+          borrowPoints: r.borrowUnitSeconds + r.borrowAssets * elapsed,
+        };
+      })
+      .sort((a, b) => Number(b.supplyPoints + b.borrowPoints - (a.supplyPoints + a.borrowPoints))),
+  );
+});
+
 app.get("/stats", async (c) => {
   const [markets, vaults, liquidations] = await Promise.all([
     db.select().from(schema.market),
