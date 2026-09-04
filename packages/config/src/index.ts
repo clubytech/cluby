@@ -65,6 +65,120 @@ export const stocks = {
     name: "Hims & Hers Health",
     exchange: "NYSE",
   },
+  MSFT: {
+    address: "0xe93237C50D904957Cf27E7B1133b510C669c2e74",
+    feed: "0x45C3C877C15E6BA2EBB19eA114Ea508d14C1Af2E",
+    feedAggregator: undefined,
+    usdgPool: { address: "0xeb60bcd1d920ad6e102690ccfc6fb488899e1510", fee: 3000, cardinality: 1801 },
+    name: "Microsoft",
+    exchange: "Nasdaq",
+  },
+  QQQ: {
+    address: "0xD5f3879160bc7c32ebb4dC785F8a4F505888de68",
+    feed: "0x80901d846d5D7B030F26B480776EE3b29374C2ae",
+    feedAggregator: undefined,
+    // The deeper fee-500 pool only carries cardinality 300; the 3000 pool is the safer TWAP source.
+    usdgPool: { address: "0xd60a5d14db690b7afad71f76b108071d7175597d", fee: 500, cardinality: 300 },
+    name: "Invesco QQQ Trust",
+    exchange: "Nasdaq",
+  },
+  GOOGL: {
+    address: "0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3",
+    feed: "0xF6f373a037c30F0e5010d854385cA89185AE638b",
+    feedAggregator: undefined,
+    usdgPool: { address: "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7", fee: 500, cardinality: 1801 },
+    name: "Alphabet",
+    exchange: "Nasdaq",
+  },
+  AMZN: {
+    address: "0x12f190a9F9d7D37a250758b26824B97CE941bF54",
+    feed: "0xD5a1508ceD74c084eBf3cBe853e2C968fB2a651C",
+    feedAggregator: undefined,
+    usdgPool: { address: "0x8ac92da74ab5f3b1d024dc1943ad7e15dc4179ef", fee: 3000, cardinality: 1801 },
+    name: "Amazon",
+    exchange: "Nasdaq",
+  },
+  META: {
+    address: "0xc0D6457C16Cc70d6790Dd43521C899C87ce02f35",
+    feed: "0x7C38C00C30BEe9378381E7B6135d7283356D71b1",
+    feedAggregator: undefined,
+    usdgPool: { address: "0x107a7cb40d8665360ba10e59471af06150a50922", fee: 3000, cardinality: 1400 },
+    name: "Meta Platforms",
+    exchange: "Nasdaq",
+  },
+  SGOV: {
+    address: "0x92FD66527192E3e61d4DDd13322Aa222DE86F9B5",
+    feed: "0xa0DF4ee0fFf975306345875E3548Fcc519577A11",
+    feedAggregator: undefined,
+    usdgPool: { address: "0xfab520051f96f4d2a32c22b6a3dd7fffdf231bfe", fee: 3000, cardinality: 1400 },
+    name: "iShares 0-3 Month Treasury Bond ETF",
+    exchange: "NYSE Arca",
+    /**
+     * The only token whose uiMultiplier is not 1: 1.005101770003214918, already effective.
+     * Any oracle for SGOV has to carry it, or the collateral is undervalued by half a percent.
+     */
+    uiMultiplier: 1_005_101_770_003_214_918n,
+  },
+  SPCX: {
+    address: "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
+    feed: "0xB265810950ba6c5C0Ff821c9963014a56fD8Bffb",
+    feedAggregator: undefined,
+    usdgPool: { address: "0xc61284332117c3fb23a2a56cceffd07f7af60029", fee: 500, cardinality: 3100 },
+    name: "SpaceX (pre-IPO)",
+    exchange: "Private",
+  },
+} as const;
+
+/**
+ * Chain-native tokens: memecoins and an index, not tokenized equities. No Chainlink feed exists for
+ * any of them (checked against the full 56-feed registry, not a failed lookup), so a market on one
+ * has to be priced by TWAP.
+ */
+export const nativeTokens = {
+  PONS: {
+    address: "0x39dBED3a2bd333467115dE45665cC57F813C4571",
+    usdgPool: { address: "0x7a192e71564ec66ee0763e328a3ac274942de4e1", fee: 10000, cardinality: 300 },
+    name: "Pons",
+  },
+  CASHCAT: {
+    address: "0x020bfC650A365f8BB26819deAAbF3E21291018b4",
+    usdgPool: { address: "0x4b0c312ffbb068f6a0bea128759e35d94b94d0e1", fee: 10000, cardinality: 360 },
+    name: "Cashcat",
+  },
+  INDEX: {
+    address: "0x56910D4409F3a0C78C64DD8D0545FF0705389870",
+    // On-chain symbol is "Index", and the only pool has observationCardinality 1 — no TWAP is
+    // possible until increaseObservationCardinalityNext has been called and the window has filled.
+    usdgPool: { address: "0xb89de909ae9fdf14592c868ad532c4ca3d100222", fee: 10000, cardinality: 1 },
+    name: "Index",
+  },
+} as const;
+
+/**
+ * How to tell a real tokenized stock from the ticker-squatting memecoins that share its symbol.
+ * Blockscout returns 30+ hits for a ticker like SPCX; symbol alone proves nothing.
+ * Verified 2026-09-04: the real tokens answer `uiMultiplier()`, the impostors revert on it.
+ */
+export const stockTokenIdentity = {
+  deployer: "0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046",
+  implementation: "Stock",
+  /** Selector that must not revert: uiMultiplier(). */
+  marker: "0xa60bf13d",
+  knownImpostors: [
+    "0xd6a1232c3403dCaaE4f65Dc76Ee3C40528A51D2B", // fake SPCX, a CurvePumpToken
+  ],
+} as const;
+
+/**
+ * Every Chainlink description on this chain resolves through TWO proxies to the same aggregator,
+ * returning identical answers but different round ids (phase 1 vs phase 2). Pin the one recorded in
+ * `stocks[…].feed` and never pattern-match the description: naming runs across three schemes
+ * ("RHMSFT / USD", "Robinhood GOOGL / USD", "Robinhood SGOV-USD").
+ */
+export const feedRegistry = {
+  deployer: "0xfE3c266C0F994f9552b70D9107214Fe0ED0d74d8",
+  proxyCount: 113,
+  distinctFeeds: 56,
 } as const;
 
 export type StockSymbol = keyof typeof stocks;
@@ -148,12 +262,16 @@ export const marketCatalog: MarketDef[] = [
   { key: "TSLA", side: "long", collateral: "TSLA", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 1000, status: "planned" },
   { key: "ETH", side: "long", collateral: "WETH", loan: "USDG", tier: "eth", oracle: "chainlink", category: "Crypto", supplyCapUsd: 5000, status: "planned" },
   { key: "HIMS", side: "long", collateral: "HIMS", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 500, status: "planned", note: "No Chainlink feed on this chain; priced by a 30–60 min v3 TWAP once cardinality is raised." },
-  { key: "MSFT", side: "long", collateral: "MSFT", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
-  { key: "GOOGL", side: "long", collateral: "GOOGL", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
-  { key: "AMZN", side: "long", collateral: "AMZN", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
-  { key: "META", side: "long", collateral: "META", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 1000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
-  { key: "QQQ", side: "long", collateral: "QQQ", loan: "USDG", tier: "stock", oracle: "chainlink", category: "ETF", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
-  { key: "SGOV", side: "long", collateral: "SGOV", loan: "USDG", tier: "tbills", oracle: "chainlink", category: "T-bills", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+  { key: "SPCX", side: "long", collateral: "SPCX", loan: "USDG", tier: "longTail", oracle: "chainlink", category: "Pre-IPO", supplyCapUsd: 2000, status: "planned", note: "Pre-IPO: a Chainlink feed exists, but the exit is one pool — the long-tail LLTV stands." },
+  { key: "PONS", side: "long", collateral: "PONS", loan: "USDG", tier: "longTail", oracle: "twap", category: "Onchain-native", supplyCapUsd: 5000, status: "planned", note: "No feed on this chain; priced by a 10000-fee pool TWAP." },
+  { key: "CASHCAT", side: "long", collateral: "CASHCAT", loan: "USDG", tier: "longTail", oracle: "twap", category: "Onchain-native", supplyCapUsd: 1000, status: "planned", note: "No feed; thin pool, so the cap starts low." },
+  { key: "INDEX", side: "long", collateral: "INDEX", loan: "USDG", tier: "longTail", oracle: "twap", category: "Onchain-native", supplyCapUsd: 500, status: "blocked", note: "Its only pool has observationCardinality 1 — no TWAP until increaseObservationCardinalityNext is called and the window fills." },
+  { key: "MSFT", side: "long", collateral: "MSFT", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "planned" },
+  { key: "GOOGL", side: "long", collateral: "GOOGL", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "planned" },
+  { key: "AMZN", side: "long", collateral: "AMZN", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "planned" },
+  { key: "META", side: "long", collateral: "META", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 1000, status: "planned" },
+  { key: "QQQ", side: "long", collateral: "QQQ", loan: "USDG", tier: "stock", oracle: "chainlink", category: "ETF", supplyCapUsd: 2000, status: "planned" },
+  { key: "SGOV", side: "long", collateral: "SGOV", loan: "USDG", tier: "tbills", oracle: "chainlink", category: "T-bills", supplyCapUsd: 2000, status: "planned" },
 
   // Short: post USDG, borrow the stock itself and sell it (PLAN §1A.1). Priced by an inverse oracle.
   { key: "NVDA-SHORT", side: "short", collateral: "USDG", loan: "NVDA", tier: "short", oracle: "inverse", category: "Stocks", supplyCapUsd: 1000, status: "planned" },

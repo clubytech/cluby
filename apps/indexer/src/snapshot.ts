@@ -1,74 +1,110 @@
 import { ponder } from "ponder:registry";
-import { market, feedTick, stockToken, snapshot } from "ponder:schema";
-import { lensAbi, stockTokenAbi } from "@cluby/abi";
-import { stocks } from "@cluby/config";
+import { snapshot, feedTick, market } from "ponder:schema";
+import { deployments, morpho, stocks } from "@cluby/config";
+import { irmAbi, morphoBlueAbi, oracleAbi, chainlinkFeedAbi } from "@cluby/sdk";
 
-const LENS = process.env.LENS_ADDR as `0x${string}`;
-const symbolOf = (addr: string) =>
-  Object.entries(stocks).find(([, s]) => s.address.toLowerCase() === addr.toLowerCase())?.[0] ?? "?";
-
-ponder.on("Feed:AnswerUpdated", async ({ event, context }) => {
-  await context.db.insert(feedTick).values({
-    id: `${event.transaction.hash}-${event.log.logIndex}`,
-    aggregator: event.log.address,
-    answer: event.args.current,
-    updatedAt: Number(event.args.updatedAt),
-  });
-});
-
-/** Every ~5 minutes: refresh stock token facts and write a snapshot per market via Lens. */
+/**
+ * Every ~5 minutes: one row per market for the charts, and one row per stock comparing the feed
+ * with the pool. The divergence column is what the watchdog alerts on — it is cheaper to store the
+ * comparison than to recompute it from two series later.
+ */
 ponder.on("Snapshot:block", async ({ event, context }) => {
   const ts = Number(event.block.timestamp);
-  const markets = await context.db.sql.select().from(market);
-  for (const m of markets) {
-    let v: any;
-    try {
-      v = await context.client.readContract({ abi: lensAbi, address: LENS, functionName: "marketView", args: [m.id] });
-    } catch {
-      continue;
-    }
-    const [supply, mult, paused] = await Promise.all([
-      context.client.readContract({ abi: stockTokenAbi, address: m.stock, functionName: "totalSupply" }),
-      context.client.readContract({ abi: stockTokenAbi, address: m.stock, functionName: "uiMultiplier" }).catch(() => 10n ** 18n),
-      context.client.readContract({ abi: stockTokenAbi, address: m.stock, functionName: "oraclePaused" }).catch(() => false),
-    ]);
-    await context.db
-      .insert(stockToken)
-      .values({ address: m.stock, symbol: symbolOf(m.stock), totalSupply: supply, uiMultiplier: mult, oraclePaused: paused, updatedAt: ts })
-      .onConflictDoUpdate({ totalSupply: supply, uiMultiplier: mult, oraclePaused: paused, updatedAt: ts });
+  const ids = Object.values(deployments.markets).map((m) => m.id);
 
-    const s = v.state;
-    const borrow = BigInt(s.totalBorrowAssets);
-    const siBps = supply > 0n ? Number((borrow * 10_000n) / supply) : 0;
-    const feed = BigInt(v.quote.feedPrice);
-    const twap = BigInt(v.quote.twapPrice);
-    const premiumBps = feed > 0n && twap > 0n ? Number((twap * 10_000n) / feed) - 10_000 : 0;
-    const util = BigInt(v.utilizationWad);
-    const apr = BigInt(v.borrowAprWad);
+  for (const id of ids) {
+    const [params, state] = await Promise.all([
+      context.client.readContract({
+        address: morpho.blue.address as `0x${string}`,
+        abi: morphoBlueAbi,
+        functionName: "idToMarketParams",
+        args: [id],
+      }),
+      context.client.readContract({
+        address: morpho.blue.address as `0x${string}`,
+        abi: morphoBlueAbi,
+        functionName: "market",
+        args: [id],
+      }),
+    ]);
+
+    const marketParams = {
+      loanToken: params[0],
+      collateralToken: params[1],
+      oracle: params[2],
+      irm: params[3],
+      lltv: params[4],
+    };
+    const marketState = {
+      totalSupplyAssets: state[0],
+      totalSupplyShares: state[1],
+      totalBorrowAssets: state[2],
+      totalBorrowShares: state[3],
+      lastUpdate: state[4],
+      fee: state[5],
+    };
+
+    const [rate, price] = await Promise.all([
+      context.client
+        .readContract({
+          address: morpho.adaptiveCurveIrm.address as `0x${string}`,
+          abi: irmAbi,
+          functionName: "borrowRateView",
+          args: [marketParams, marketState],
+        })
+        .catch(() => 0n),
+      context.client
+        .readContract({ address: marketParams.oracle, abi: oracleAbi, functionName: "price" })
+        .catch(() => 0n),
+    ]);
+
+    const utilizationBps =
+      marketState.totalSupplyAssets === 0n
+        ? 0
+        : Number((marketState.totalBorrowAssets * 10_000n) / marketState.totalSupplyAssets);
+
     await context.db.insert(snapshot).values({
-      id: `${m.id}-${event.block.number}`,
-      marketId: m.id,
-      blockNumber: event.block.number,
-      ts,
-      totalSupplyAssets: BigInt(s.totalSupplyAssets),
-      totalBorrowAssets: borrow,
-      utilizationWad: util,
-      borrowAprWad: apr,
-      supplyAprWad: BigInt(v.supplyAprWad),
-      price: BigInt(v.price),
-      feedPrice: feed,
-      twapPrice: twap,
-      weekendMode: v.weekendMode,
-      float: supply,
-      shortInterestBps: siBps,
-      premiumBps,
-      hardToBorrow: util > 8n * 10n ** 17n || apr > 5n * 10n ** 17n,
+      id: `${id}-${ts}`,
+      marketId: id,
+      timestamp: ts,
+      supplyAssets: marketState.totalSupplyAssets,
+      borrowAssets: marketState.totalBorrowAssets,
+      utilizationBps,
+      borrowRatePerSecond: rate,
+      price,
     });
-    await context.db.update(market, { id: m.id }).set({
-      totalSupplyAssets: BigInt(s.totalSupplyAssets),
-      totalBorrowAssets: borrow,
-      totalSupplyShares: BigInt(s.totalSupplyShares),
-      totalBorrowShares: BigInt(s.totalBorrowShares),
+
+    await context.db
+      .update(market, { id })
+      .set({
+        totalSupplyAssets: marketState.totalSupplyAssets,
+        totalSupplyShares: marketState.totalSupplyShares,
+        totalBorrowAssets: marketState.totalBorrowAssets,
+        totalBorrowShares: marketState.totalBorrowShares,
+        fee: marketState.fee,
+        lastUpdate: ts,
+      })
+      .catch(() => undefined);
+  }
+
+  for (const [symbol, s] of Object.entries(stocks)) {
+    if (!("feed" in s) || !s.feed) continue;
+    const round = await context.client
+      .readContract({ address: s.feed as `0x${string}`, abi: chainlinkFeedAbi, functionName: "latestRoundData" })
+      .catch(() => null);
+    if (!round) continue;
+    const feedPrice = round[1] as bigint;
+    if (feedPrice <= 0n) continue;
+
+    // The pool leg is filled by the keeper, which can afford the observe() call budget;
+    // storing zero here keeps the row shape stable and the divergence explicit rather than absent.
+    await context.db.insert(feedTick).values({
+      id: `${symbol}-${ts}`,
+      symbol,
+      timestamp: ts,
+      feedPrice,
+      twapPrice: 0n,
+      divergenceBps: 0,
     });
   }
 });

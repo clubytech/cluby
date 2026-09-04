@@ -1,6 +1,6 @@
 // Copies ABIs from Foundry artifacts into typed TS modules. Run after `forge build`:
 //   node packages/abi/gen.mjs
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,17 +9,20 @@ const out = join(root, "contracts", "out");
 const dst = join(root, "packages", "abi", "src");
 mkdirSync(dst, { recursive: true });
 
+// Our own contracts only. Morpho Blue, the IRM, the oracle factory and the vault are described in
+// @cluby/sdk by hand — they are not built here, so there is no artifact to copy.
 const contracts = {
-  market: "Market.sol/Market.json",
-  kinkedIrm: "KinkedIRM.sol/KinkedIRM.json",
-  stockOracle: "StockOracle.sol/StockOracle.json",
   lens: "Lens.sol/Lens.json",
-  shortRouter: "ShortRouter.sol/ShortRouter.json",
   flashLiquidator: "FlashLiquidator.sol/FlashLiquidator.json",
 };
 
 const index = [];
 for (const [name, file] of Object.entries(contracts)) {
+  // The Morpho-shaped versions of these are not written yet; skip rather than fail the pipeline.
+  if (!existsSync(join(out, file))) {
+    console.warn(`skip ${name}: ${file} not built`);
+    continue;
+  }
   const artifact = JSON.parse(readFileSync(join(out, file), "utf8"));
   const body = `export const ${name}Abi = ${JSON.stringify(artifact.abi, null, 2)} as const;\n`;
   writeFileSync(join(dst, `${name}.ts`), body);

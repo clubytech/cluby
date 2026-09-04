@@ -80,3 +80,57 @@ Uniswap v4: PoolManager 0x8366a39CC670B4001A1121B8F6A443A643e40951 (no built-in 
 - Float exclusions (issuer/bridge holders): to be derived in the indexer from top holders.
 - 1inch quote coverage for stock tokens: check in keeper phase.
 - Relative depth of v3 pools vs v4 and Rialto propAMM: matters for liquidator routing, not for v1 contracts.
+
+---
+
+## Cluby additions (measured 2026-09-04, block ~54.37M)
+
+### The public RPC gates `eth_call` on a User-Agent header
+`https://rpc.mainnet.chain.robinhood.com` answers `eth_chainId` with no headers, but returns
+**403 Forbidden for `eth_call`** unless the request carries a non-empty `User-Agent` — any value
+works. Node's fetch sends none, so a viem client reads chain id fine and then fails every contract
+read, which looks like an application bug and is not one. `apps/web/src/lib/chain.ts` sets the
+header explicitly. Blockscout behaves the same way; it is not Cloudflare-blocked with a UA set.
+
+### Morpho Blue stack, verified by `eth_getCode`
+| Contract | Address | Code |
+|---|---|---|
+| Morpho Blue | `0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010` | 15,582 bytes |
+| AdaptiveCurveIRM | `0x2BD3d5965B26B51814AC95127B2b80dD6CcC0fa1` | 2,282 bytes |
+| ChainlinkOracleV2Factory | `0xB7c16F6F8cF531447Bf27Ca7220f981E79C9cdF2` | 4,464 bytes |
+
+The vault factory (MetaMorpho V1.1 / Vault V2), Bundler3, PreLiquidationFactory and PublicAllocator
+are **not** at their Ethereum or Base addresses here — probed, all empty. A vault therefore needs our
+own deploy of the MetaMorpho V1.1 factory from Morpho sources.
+
+### Ticker squatting: symbol proves nothing
+Blockscout returns 30+ tokens per ticker. The real tokenized stocks answer `uiMultiplier()`
+(selector `0xa60bf13d`); the impostors revert on it. Verified against a fake SPCX at
+`0xd6a1232c3403dCaaE4f65Dc76Ee3C40528A51D2B`, which decodes the identical name and is a
+`CurvePumpToken`. All real stock tokens come from deployer
+`0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046`, implementation `Stock`.
+
+**SGOV is the only token whose `uiMultiplier` is not 1**: `1.005101770003214918`, already effective.
+Any oracle for it has to carry the multiplier or the collateral is undervalued by half a percent.
+
+### Feeds
+Every Chainlink description resolves through **two** proxy addresses to the same aggregator: same
+answers, different round ids (phase 1 vs phase 2). Pin the one recorded in `packages/config`.
+Descriptions follow three inconsistent naming schemes (`RHMSFT / USD`, `Robinhood GOOGL / USD`,
+`Robinhood SGOV-USD`), so never pattern-match them. The registry holds 113 proxies over 56 distinct
+feeds, from deployer `0xfE3c266C0F994f9552b70D9107214Fe0ED0d74d8`.
+
+Feeds added to `packages/config` beyond the original five: MSFT, QQQ, GOOGL, AMZN, META, SGOV, SPCX.
+**No feed exists for PONS, CASHCAT or INDEX** — checked against the whole registry, not a failed
+lookup — so those markets can only be priced by TWAP.
+
+### Pools and TWAP readiness
+Cardinality is the constraint, not liquidity:
+- QQQ's deepest USDG pool (fee 500) carries cardinality 300; the fee-3000 pool is the safer source.
+- SGOV's fee-500 pool has real liquidity but cardinality 1.
+- INDEX's only pool has **cardinality 1** — no TWAP of any length is possible until
+  `increaseObservationCardinalityNext` has been called and the window has filled.
+
+TWAP reads over a 30-minute window agree with pool spot within 0.9% (HIMS $27.58 vs $27.61,
+PONS $0.7466 vs $0.7532, CASHCAT $0.2589 vs $0.2605), which is the check that the tick decoding and
+the decimal handling are right.

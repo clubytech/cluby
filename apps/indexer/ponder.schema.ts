@@ -1,25 +1,51 @@
 import { onchainTable, index } from "ponder";
 
+/** One row per Cluby market, kept level with Morpho Blue's own accounting. */
 export const market = onchainTable("market", (t) => ({
   id: t.hex().primaryKey(),
-  stock: t.hex().notNull(),
-  symbol: t.text().notNull(),
-  collateral: t.hex().notNull(),
+  key: t.text().notNull(),
+  loanToken: t.hex().notNull(),
+  collateralToken: t.hex().notNull(),
   oracle: t.hex().notNull(),
   irm: t.hex().notNull(),
-  initialMarginBps: t.integer().notNull(),
-  liqThresholdBps: t.integer().notNull(),
-  liqBonusBps: t.integer().notNull(),
-  borrowCap: t.bigint().notNull(),
-  flags: t.integer().notNull(),
-  feeBps: t.integer().notNull(),
+  lltv: t.bigint().notNull(),
   totalSupplyAssets: t.bigint().notNull(),
   totalSupplyShares: t.bigint().notNull(),
   totalBorrowAssets: t.bigint().notNull(),
   totalBorrowShares: t.bigint().notNull(),
+  fee: t.bigint().notNull(),
   lastUpdate: t.integer().notNull(),
   createdAt: t.integer().notNull(),
+  /** Cumulative interest paid by borrowers, for the rebate epochs. */
+  interestAccrued: t.bigint().notNull(),
+  liquidationCount: t.integer().notNull(),
+  badDebtAssets: t.bigint().notNull(),
 }));
+
+export const vault = onchainTable("vault", (t) => ({
+  id: t.hex().primaryKey(),
+  key: t.text().notNull(),
+  asset: t.hex().notNull(),
+  totalAssets: t.bigint().notNull(),
+  totalShares: t.bigint().notNull(),
+  feeShares: t.bigint().notNull(),
+  depositorCount: t.integer().notNull(),
+  updatedAt: t.integer().notNull(),
+}));
+
+/** How much of a vault sits in each market, and the cap it may not exceed. */
+export const vaultAllocation = onchainTable(
+  "vault_allocation",
+  (t) => ({
+    id: t.text().primaryKey(), // `${vault}-${marketId}`
+    vault: t.hex().notNull(),
+    marketId: t.hex().notNull(),
+    cap: t.bigint().notNull(),
+    supplied: t.bigint().notNull(),
+    updatedAt: t.integer().notNull(),
+  }),
+  (tbl) => ({ byVault: index().on(tbl.vault) }),
+);
 
 export const position = onchainTable(
   "position",
@@ -30,6 +56,10 @@ export const position = onchainTable(
     supplyShares: t.bigint().notNull(),
     borrowShares: t.bigint().notNull(),
     collateral: t.bigint().notNull(),
+    /** Interest this borrower has paid, the basis of the rebate. */
+    interestPaid: t.bigint().notNull(),
+    liquidatedCount: t.integer().notNull(),
+    openedAt: t.integer().notNull(),
     updatedAt: t.integer().notNull(),
   }),
   (tbl) => ({ byMarket: index().on(tbl.marketId), byUser: index().on(tbl.user) }),
@@ -40,82 +70,90 @@ export const txEvent = onchainTable(
   (t) => ({
     id: t.text().primaryKey(), // `${txHash}-${logIndex}`
     marketId: t.hex().notNull(),
-    kind: t.text().notNull(), // supply|withdraw|supplyCollateral|withdrawCollateral|borrow|repay|liquidate
+    kind: t.text().notNull(),
     user: t.hex().notNull(),
     caller: t.hex().notNull(),
     assets: t.bigint().notNull(),
     shares: t.bigint().notNull(),
-    collateral: t.bigint().notNull(),
     txHash: t.hex().notNull(),
     blockNumber: t.bigint().notNull(),
-    ts: t.integer().notNull(),
+    timestamp: t.integer().notNull(),
   }),
   (tbl) => ({ byMarket: index().on(tbl.marketId), byUser: index().on(tbl.user) }),
 );
 
-export const liquidation = onchainTable("liquidation", (t) => ({
-  id: t.text().primaryKey(),
-  marketId: t.hex().notNull(),
-  borrower: t.hex().notNull(),
-  liquidator: t.hex().notNull(),
-  repaidAssets: t.bigint().notNull(),
-  repaidShares: t.bigint().notNull(),
-  seizedCollateral: t.bigint().notNull(),
-  badDebtAssets: t.bigint().notNull(),
-  txHash: t.hex().notNull(),
-  ts: t.integer().notNull(),
-}));
+export const liquidation = onchainTable(
+  "liquidation",
+  (t) => ({
+    id: t.text().primaryKey(),
+    marketId: t.hex().notNull(),
+    borrower: t.hex().notNull(),
+    liquidator: t.hex().notNull(),
+    repaidAssets: t.bigint().notNull(),
+    seizedAssets: t.bigint().notNull(),
+    badDebtAssets: t.bigint().notNull(),
+    /** True when our own keeper did it, which is how we measure whether it is working. */
+    byKeeper: t.boolean().notNull(),
+    txHash: t.hex().notNull(),
+    timestamp: t.integer().notNull(),
+  }),
+  (tbl) => ({ byMarket: index().on(tbl.marketId), byBorrower: index().on(tbl.borrower) }),
+);
 
-export const accrual = onchainTable("accrual", (t) => ({
-  id: t.text().primaryKey(),
-  marketId: t.hex().notNull(),
-  borrowRate: t.bigint().notNull(), // per-second WAD
-  interest: t.bigint().notNull(),
-  feeShares: t.bigint().notNull(),
-  ts: t.integer().notNull(),
-}));
+/** Five-minute series behind every chart on the site. */
+export const snapshot = onchainTable(
+  "snapshot",
+  (t) => ({
+    id: t.text().primaryKey(), // `${marketId}-${timestamp}`
+    marketId: t.hex().notNull(),
+    timestamp: t.integer().notNull(),
+    supplyAssets: t.bigint().notNull(),
+    borrowAssets: t.bigint().notNull(),
+    utilizationBps: t.integer().notNull(),
+    borrowRatePerSecond: t.bigint().notNull(),
+    price: t.bigint().notNull(),
+  }),
+  (tbl) => ({ byMarket: index().on(tbl.marketId, tbl.timestamp) }),
+);
 
+/** Oracle watch: what the feed said versus what the pool said, so divergence is a query. */
 export const feedTick = onchainTable(
   "feed_tick",
   (t) => ({
     id: t.text().primaryKey(),
-    aggregator: t.hex().notNull(),
-    answer: t.bigint().notNull(), // 8 decimals
-    updatedAt: t.integer().notNull(),
+    symbol: t.text().notNull(),
+    timestamp: t.integer().notNull(),
+    feedPrice: t.bigint().notNull(),
+    twapPrice: t.bigint().notNull(),
+    divergenceBps: t.integer().notNull(),
   }),
-  (tbl) => ({ byAgg: index().on(tbl.aggregator) }),
+  (tbl) => ({ bySymbol: index().on(tbl.symbol, tbl.timestamp) }),
 );
 
-export const stockToken = onchainTable("stock_token", (t) => ({
-  address: t.hex().primaryKey(),
-  symbol: t.text().notNull(),
-  totalSupply: t.bigint().notNull(),
-  uiMultiplier: t.bigint().notNull(),
-  oraclePaused: t.boolean().notNull(),
+export const creditScore = onchainTable("credit_score", (t) => ({
+  id: t.hex().primaryKey(), // user
+  score: t.integer().notNull(),
+  borrowVolume: t.bigint().notNull(),
+  interestPaid: t.bigint().notNull(),
+  liquidations: t.integer().notNull(),
+  daysActive: t.integer().notNull(),
   updatedAt: t.integer().notNull(),
 }));
 
-/** Periodic market snapshot: what the board and charts read. */
-export const snapshot = onchainTable(
-  "snapshot",
-  (t) => ({
-    id: t.text().primaryKey(), // `${marketId}-${blockNumber}`
-    marketId: t.hex().notNull(),
-    blockNumber: t.bigint().notNull(),
-    ts: t.integer().notNull(),
-    totalSupplyAssets: t.bigint().notNull(),
-    totalBorrowAssets: t.bigint().notNull(),
-    utilizationWad: t.bigint().notNull(),
-    borrowAprWad: t.bigint().notNull(),
-    supplyAprWad: t.bigint().notNull(),
-    price: t.bigint().notNull(), // 1e36
-    feedPrice: t.bigint().notNull(),
-    twapPrice: t.bigint().notNull(),
-    weekendMode: t.boolean().notNull(),
-    float: t.bigint().notNull(), // stock totalSupply
-    shortInterestBps: t.integer().notNull(), // totalBorrow / float
-    premiumBps: t.integer().notNull(), // twap/feed - 1
-    hardToBorrow: t.boolean().notNull(), // utilization > 80% or apr > 50%
-  }),
-  (tbl) => ({ byMarket: index().on(tbl.marketId, tbl.ts) }),
-);
+export const rebateEpoch = onchainTable("rebate_epoch", (t) => ({
+  id: t.text().primaryKey(), // epoch number
+  epoch: t.integer().notNull(),
+  root: t.hex(),
+  totalRebate: t.bigint().notNull(),
+  claimedRebate: t.bigint().notNull(),
+  startedAt: t.integer().notNull(),
+  endedAt: t.integer(),
+}));
+
+export const builder = onchainTable("builder", (t) => ({
+  id: t.hex().primaryKey(),
+  label: t.text(),
+  referredVolume: t.bigint().notNull(),
+  feeEarned: t.bigint().notNull(),
+  updatedAt: t.integer().notNull(),
+}));

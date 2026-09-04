@@ -14,7 +14,8 @@
     "@cluby/config": "workspace:*",
     "hono": "^4",
     "ponder": "0.17.8",
-    "viem": "2.56.3"
+    "viem": "2.56.3",
+    "@cluby/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",

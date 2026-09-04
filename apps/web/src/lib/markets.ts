@@ -1,27 +1,35 @@
 import {
-  FEED_MAX_AGE,
-  LLTV,
-  SAFE_CAP_MARGIN,
   deployments,
   economics,
-  external,
+  LLTV,
   marketCatalog,
   morpho,
-  stocks,
-  tokens,
   vaultCatalog,
   type ListingStatus,
-  type MarketDef,
   type MarketSide,
   type OracleKind,
 } from "@cluby/config";
-import { chainlinkFeedAbi, irmAbi, morphoBlueAbi } from "./abi";
+import {
+  decimalsOf,
+  feedOf,
+  getMarketParams,
+  getMarketState,
+  getRates,
+  maxAgeOf,
+  poolOf,
+  readFeed,
+  readTwap,
+  safeLtvOf,
+  subjectOf,
+  tokenAddressOf,
+} from "@cluby/sdk";
 import { publicClient } from "./chain";
+
+export type PriceSource = "chainlink" | "twap" | null;
 
 export type MarketView = {
   key: string;
   side: MarketSide;
-  /** Symbol the row is named after: the collateral on a long, the borrowed stock on a short. */
   subject: string;
   collateralSymbol: string;
   loanSymbol: string;
@@ -35,6 +43,7 @@ export type MarketView = {
   oracle: OracleKind;
   feed: `0x${string}` | null;
   price: number | null;
+  priceSource: PriceSource;
   priceAge: number | null;
   priceStale: boolean;
   supplyCapUsd: number;
@@ -47,114 +56,48 @@ export type MarketView = {
   marketId: `0x${string}` | null;
 };
 
-const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
-
-function ratePerSecondToApr(ratePerSecondWad: bigint): number {
-  // Morpho accrues continuously, so the honest yearly figure is e^(r·t) − 1, not r·t.
-  return Math.expm1((Number(ratePerSecondWad) / 1e18) * SECONDS_PER_YEAR);
-}
-
-function tokenAddress(symbol: string): `0x${string}` | null {
-  if (symbol in tokens) return tokens[symbol as keyof typeof tokens].address as `0x${string}`;
-  if (symbol in stocks) return stocks[symbol as keyof typeof stocks].address as `0x${string}`;
-  return null;
-}
-
-function feedAddress(symbol: string): `0x${string}` | null {
-  if (symbol === "WETH" || symbol === "ETH") return external.ethUsdFeed as `0x${string}`;
-  const s = stocks[symbol as keyof typeof stocks];
-  if (s && "feed" in s && s.feed) return s.feed as `0x${string}`;
-  return null;
-}
-
-/** The asset whose price the row is about: what you post on a long, what you owe on a short. */
-function subjectSymbol(m: MarketDef): string {
-  return m.side === "long" ? m.collateral : m.loan;
-}
-
-const priceCache = new Map<string, { at: number; price: number | null; age: number | null }>();
-
-async function readPrice(feed: `0x${string}` | null) {
-  if (!feed) return { price: null, age: null };
-  const hit = priceCache.get(feed);
-  if (hit && Date.now() - hit.at < 15_000) return { price: hit.price, age: hit.age };
-  try {
-    const [data, decimals] = await Promise.all([
-      publicClient.readContract({ address: feed, abi: chainlinkFeedAbi, functionName: "latestRoundData" }),
-      publicClient.readContract({ address: feed, abi: chainlinkFeedAbi, functionName: "decimals" }),
-    ]);
-    const answer = data[1];
-    if (answer <= 0n) throw new Error("feed has no answer");
-    const out = {
-      price: Number(answer) / 10 ** Number(decimals),
-      age: Math.max(0, Math.floor(Date.now() / 1000) - Number(data[3])),
-    };
-    priceCache.set(feed, { at: Date.now(), ...out });
-    return out;
-  } catch {
-    return { price: null, age: null };
-  }
-}
-
-async function readMarketState(marketId: `0x${string}`) {
-  const [params, state] = await Promise.all([
-    publicClient.readContract({
-      address: morpho.blue.address as `0x${string}`,
-      abi: morphoBlueAbi,
-      functionName: "idToMarketParams",
-      args: [marketId],
-    }),
-    publicClient.readContract({
-      address: morpho.blue.address as `0x${string}`,
-      abi: morphoBlueAbi,
-      functionName: "market",
-      args: [marketId],
-    }),
-  ]);
-
-  let borrowApr: number | null = null;
-  try {
-    const rate = await publicClient.readContract({
-      address: morpho.adaptiveCurveIrm.address as `0x${string}`,
-      abi: irmAbi,
-      functionName: "borrowRateView",
-      args: [
-        { loanToken: params[0], collateralToken: params[1], oracle: params[2], irm: params[3], lltv: params[4] },
-        {
-          totalSupplyAssets: state[0],
-          totalSupplyShares: state[1],
-          totalBorrowAssets: state[2],
-          totalBorrowShares: state[3],
-          lastUpdate: state[4],
-          fee: state[5],
-        },
-      ],
-    });
-    borrowApr = ratePerSecondToApr(rate);
-  } catch {
-    borrowApr = null;
-  }
-
-  return { state, borrowApr };
-}
+const USDG_DECIMALS = 6;
+/** Long enough that a single swap cannot move it, short enough to track a real move (PLAN §1.3). */
+const TWAP_WINDOW = 1800;
 
 /**
- * Every market in the catalog, priced live. A market that has not been created on chain still
- * carries a real oracle price — the Chainlink feed exists whether or not our market does — but its
- * sizes read zero and its status says why.
+ * One price per subject asset. A Chainlink feed is preferred; assets without one — the memecoins
+ * and HIMS — are priced by the pool TWAP, which is also what their oracle contract will read.
  */
+async function priceOf(subject: string): Promise<{ price: number | null; age: number | null; source: PriceSource }> {
+  const feed = feedOf(subject);
+  if (feed) {
+    const read = await readFeed(publicClient, feed);
+    if (read) return { price: read.price, age: read.ageSeconds, source: "chainlink" };
+  }
+  const pool = poolOf(subject);
+  const token = tokenAddressOf(subject);
+  if (pool && token) {
+    const twap = await readTwap(publicClient, pool.address as `0x${string}`, token, "0x", {
+      windowSeconds: TWAP_WINDOW,
+      tokenDecimals: decimalsOf(subject),
+      quoteDecimals: USDG_DECIMALS,
+    });
+    // A TWAP is as fresh as its window: it is an average over the last half hour by construction.
+    if (twap) return { price: twap.price, age: TWAP_WINDOW, source: "twap" };
+  }
+  return { price: null, age: null, source: null };
+}
+
 export async function getMarkets(): Promise<MarketView[]> {
+  const priced = new Map<string, Awaited<ReturnType<typeof priceOf>>>();
+  await Promise.all(
+    Array.from(new Set(marketCatalog.map(subjectOf))).map(async (s) => priced.set(s, await priceOf(s))),
+  );
+
   return Promise.all(
     marketCatalog.map(async (m) => {
-      const subject = subjectSymbol(m);
-      const feed = feedAddress(subject);
-      const { price, age } = await readPrice(feed);
+      const subject = subjectOf(m);
+      const { price, age, source } = priced.get(subject) ?? { price: null, age: null, source: null };
       const lltv = Number(LLTV[m.tier]) / 1e18;
-      const safeLtv = Math.max(0, lltv - SAFE_CAP_MARGIN[m.tier] / 100);
-      const maxAge = m.category === "Crypto" ? FEED_MAX_AGE.crypto : FEED_MAX_AGE.stock;
+      const safeLtv = safeLtvOf(m);
       const deployed = deployments.markets[m.key];
       const marketId = (deployed?.id ?? null) as `0x${string}` | null;
-      const loanDecimals = m.loan === "USDG" ? 6 : 18;
 
       const base = {
         key: m.key,
@@ -162,18 +105,18 @@ export async function getMarkets(): Promise<MarketView[]> {
         subject,
         collateralSymbol: m.collateral,
         loanSymbol: m.loan,
-        collateralAddress: tokenAddress(m.collateral),
+        collateralAddress: tokenAddressOf(m.collateral),
         category: m.category,
         note: m.note ?? null,
         lltv,
         safeLtv,
-        // Leverage a Multiply position can reach against this LLTV (PLAN §1.5).
         maxLeverage: safeLtv >= 1 ? 0 : 1 / (1 - safeLtv),
         oracle: m.oracle,
-        feed,
+        feed: feedOf(subject),
         price,
+        priceSource: source,
         priceAge: age,
-        priceStale: age !== null && age > maxAge,
+        priceStale: source === "chainlink" && age !== null && age > maxAgeOf(m),
         supplyCapUsd: m.supplyCapUsd,
         marketId,
       };
@@ -191,14 +134,16 @@ export async function getMarkets(): Promise<MarketView[]> {
         };
       }
 
-      const { state, borrowApr } = await readMarketState(marketId);
-      const unit = 10 ** loanDecimals;
-      const supply = Number(state[0]) / unit;
-      const borrow = Number(state[2]) / unit;
-      // A stock-denominated market is sized in shares; value it with the same oracle price.
+      const [params, state] = await Promise.all([
+        getMarketParams(publicClient, marketId),
+        getMarketState(publicClient, marketId),
+      ]);
+      const rates = await getRates(publicClient, params, state).catch(() => null);
+      const unit = 10 ** (m.loan === "USDG" ? USDG_DECIMALS : 18);
+      const supply = Number(state.totalSupplyAssets) / unit;
+      const borrow = Number(state.totalBorrowAssets) / unit;
+      // A stock-denominated market is sized in shares; value it with the same price the oracle uses.
       const toUsd = m.loan === "USDG" ? 1 : (price ?? 0);
-      const utilization = supply === 0 ? 0 : borrow / supply;
-      const feeShare = 1 - Number(economics.introFeeWad) / 1e18;
 
       return {
         ...base,
@@ -206,9 +151,9 @@ export async function getMarkets(): Promise<MarketView[]> {
         totalSupplyUsd: supply * toUsd,
         totalBorrowUsd: borrow * toUsd,
         liquidityUsd: Math.max(0, (supply - borrow) * toUsd),
-        utilization,
-        borrowApr,
-        supplyApr: borrowApr === null ? null : borrowApr * utilization * feeShare,
+        utilization: rates?.utilization ?? 0,
+        borrowApr: rates?.borrowApy ?? null,
+        supplyApr: rates?.supplyApy ?? null,
       };
     }),
   );
@@ -266,7 +211,6 @@ export async function getVaults(): Promise<VaultView[]> {
 
 export async function getProtocolStats() {
   const markets = await getMarkets();
-  const longs = markets.filter((m) => m.side === "long");
   const shorts = markets.filter((m) => m.side === "short");
   const totalSupplyUsd = markets.reduce((a, m) => a + m.totalSupplyUsd, 0);
   const totalBorrowUsd = markets.reduce((a, m) => a + m.totalBorrowUsd, 0);
@@ -281,7 +225,7 @@ export async function getProtocolStats() {
     listedCount: markets.filter((m) => m.status === "listed").length,
     plannedCount: markets.filter((m) => m.status === "planned").length,
     blockedCount: markets.filter((m) => m.status === "blocked").length,
-    longCount: longs.length,
+    longCount: markets.length - shorts.length,
     shortCount: shorts.length,
     shortInterestUsd: shorts.reduce((a, m) => a + m.totalBorrowUsd, 0),
     capUsd: markets.reduce((a, m) => a + m.supplyCapUsd, 0),
