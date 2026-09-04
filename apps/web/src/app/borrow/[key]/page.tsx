@@ -3,6 +3,8 @@ import { getMarkets } from "@/lib/markets";
 import { age, pct, usd } from "@/lib/format";
 import { Badge, Card } from "@/components/ui";
 import { PositionPanel } from "@/components/position-panel";
+import { SeriesChart } from "@/components/series-chart";
+import { getMarketSeries } from "@/lib/series";
 
 export const revalidate = 30;
 
@@ -16,6 +18,8 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
   const markets = await getMarkets();
   const market = markets.find((m) => m.key.toLowerCase() === key.toLowerCase());
   if (!market) notFound();
+
+  const series = market.status === "listed" ? await getMarketSeries(market.key) : null;
 
   const isShort = market.side === "short";
   const oracleLabel =
@@ -65,6 +69,33 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
       <section className="bg-white">
         <div className="container-padding section-y grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="flex flex-col gap-6 lg:col-span-2">
+            {series && series.length > 1 && (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <SeriesChart
+                  label={`${market.subject} price`}
+                  points={series.map((s) => ({ x: s.timestamp, y: s.price }))}
+                  format={(v) => `$${v.toFixed(2)}`}
+                />
+                <SeriesChart
+                  label="Borrow APY"
+                  points={series.map((s) => ({ x: s.timestamp, y: s.borrowApy }))}
+                  format={(v) => `${(v * 100).toFixed(2)}%`}
+                  accent="var(--color-brand-bright)"
+                />
+                <SeriesChart
+                  label="Supplied"
+                  points={series.map((s) => ({ x: s.timestamp, y: s.supplyAssets }))}
+                  format={(v) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
+                />
+                <SeriesChart
+                  label="Utilization"
+                  points={series.map((s) => ({ x: s.timestamp, y: s.utilization }))}
+                  format={(v) => `${(v * 100).toFixed(1)}%`}
+                  accent="var(--color-brand-bright)"
+                />
+              </div>
+            )}
+
             <Card className="bg-bg-weak">
               <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Info &amp; risk</h2>
               <dl className="mt-6 flex flex-col gap-4 text-sm">
