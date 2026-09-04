@@ -211,15 +211,34 @@ export const morpho = {
 } as const;
 
 /**
- * Liquidation LTV tiers (PLAN §3.3 and §1A.2). Fixed before a market is created and immutable after.
- * `megacapTwap` is the 70% tier a megacap earns once a v3 pool backs a min(feed, twap) oracle;
- * `short` is the 66.7% that corresponds to 150% coverage on a stock-borrow market.
+ * Liquidation LTV tiers (PLAN §3.3 and §1A.2), fixed before a market is created and immutable after.
+ *
+ * Morpho Blue only accepts an LLTV that governance has enabled, and this deployment enables exactly
+ * 0, 38.5%, 62.5%, 77%, 86%, 91.5%, 94.5%, 96.5% and 98% — verified with `isLltvEnabled` on
+ * 2026-09-04. The plan's 70% tier for TWAP-backed megacaps and its 66.7% short tier are therefore
+ * not available: `createMarket` reverts with "LLTV not enabled". Both are pinned to the nearest
+ * enabled value BELOW the intended one, which is the conservative direction — a lower LLTV liquidates
+ * earlier and lends less, so nothing is exposed by the substitution.
  */
+export const ENABLED_LLTVS = [
+  0n,
+  385_000_000_000_000_000n,
+  625_000_000_000_000_000n,
+  770_000_000_000_000_000n,
+  860_000_000_000_000_000n,
+  915_000_000_000_000_000n,
+  945_000_000_000_000_000n,
+  965_000_000_000_000_000n,
+  980_000_000_000_000_000n,
+] as const;
+
 export const LLTV = {
   tbills: 860_000_000_000_000_000n,
   eth: 770_000_000_000_000_000n,
-  megacapTwap: 700_000_000_000_000_000n,
-  short: 667_000_000_000_000_000n,
+  /** Intended 70% (PLAN §1A.2); not enabled on chain, so it sits with the plain stock tier. */
+  megacapTwap: 625_000_000_000_000_000n,
+  /** Intended 66.7% — 150% coverage; not enabled, so shorts run at 160% coverage instead. */
+  short: 625_000_000_000_000_000n,
   stock: 625_000_000_000_000_000n,
   longTail: 385_000_000_000_000_000n,
 } as const;

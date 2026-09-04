@@ -134,3 +134,29 @@ Cardinality is the constraint, not liquidity:
 TWAP reads over a 30-minute window agree with pool spot within 0.9% (HIMS $27.58 vs $27.61,
 PONS $0.7466 vs $0.7532, CASHCAT $0.2589 vs $0.2605), which is the check that the tick decoding and
 the decimal handling are right.
+
+### Morpho only accepts LLTVs its governance enabled
+`isLltvEnabled` on `0x9D53…1010`, checked 2026-09-04:
+
+| LLTV | enabled |
+|---|---|
+| 0, 38.5%, 62.5%, 77%, 86%, 91.5%, 94.5%, 96.5%, 98% | yes |
+| 66.7%, 70%, 80% | **no** |
+
+`createMarket` reverts with `LLTV not enabled` for anything else, which is how PLAN §1A.2's 70%
+tier for TWAP-backed megacaps and its 66.7% short tier (150% coverage) were found to be
+unavailable. Both are pinned down to 62.5% — the nearest enabled value below the intended one, so
+the substitution is conservative: positions liquidate earlier and borrow less, never the reverse.
+
+### The short-market oracle is the long oracle inverted, not a re-parameterised one
+A short market has USDG as collateral and the stock as the borrowed asset. Its oracle must still be
+built the long way round (stock as base, USDG as quote) and then wrapped in `InverseOracle`. Passing
+the short market's own decimals to Morpho's factory inverts them a second time and produces a price
+10^24 too small — `4.32e21` instead of `4.32e45` for NVDA at $231.46 — which still looks like a
+price and would silently misprice every position. Pinned by `test_shortOracleMagnitude`.
+
+### SGOV's uiMultiplier is not in the oracle path
+Morpho's Chainlink factory prices the feed, not the token, so SGOV's `uiMultiplier` of 1.0051 is not
+applied: the market values the collateral at the bare feed price, about 0.5% below what the token
+is actually worth. That is the safe direction — collateral is understated, never overstated — but
+the gap grows as the multiplier does, so it needs a composed oracle before SGOV's cap is raised.
