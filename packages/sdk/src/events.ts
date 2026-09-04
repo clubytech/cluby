@@ -25,7 +25,9 @@ export const morphoBlueEventsAbi = [
     name: "Supply",
     inputs: [
       { name: "id", type: "bytes32", indexed: true },
-      { name: "caller", type: "address", indexed: false },
+      // Indexed here, unindexed on Withdraw and Borrow. Getting this wrong does not throw —
+      // the log simply never decodes, and the event vanishes from the index.
+      { name: "caller", type: "address", indexed: true },
       { name: "onBehalf", type: "address", indexed: true },
       { name: "assets", type: "uint256", indexed: false },
       { name: "shares", type: "uint256", indexed: false },
@@ -60,7 +62,7 @@ export const morphoBlueEventsAbi = [
     name: "Repay",
     inputs: [
       { name: "id", type: "bytes32", indexed: true },
-      { name: "caller", type: "address", indexed: false },
+      { name: "caller", type: "address", indexed: true },
       { name: "onBehalf", type: "address", indexed: true },
       { name: "assets", type: "uint256", indexed: false },
       { name: "shares", type: "uint256", indexed: false },
@@ -71,7 +73,7 @@ export const morphoBlueEventsAbi = [
     name: "SupplyCollateral",
     inputs: [
       { name: "id", type: "bytes32", indexed: true },
-      { name: "caller", type: "address", indexed: false },
+      { name: "caller", type: "address", indexed: true },
       { name: "onBehalf", type: "address", indexed: true },
       { name: "assets", type: "uint256", indexed: false },
     ],
