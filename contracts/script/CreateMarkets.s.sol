@@ -45,18 +45,24 @@ contract CreateMarkets is Script {
         twapWindow = uint32(json.readUint(".twapWindow"));
 
         uint256 count = json.readUint(".marketCount");
+        // ONLY="NVDA,SPY,ETH" restricts the run to a subset. Markets are immutable and cost real
+        // gas, so the canary creates three and the rest wait rather than all seventeen going out at
+        // once because the script had no way to say "not yet".
+        string memory only = vm.envOr("ONLY", string(""));
         console2.log("markets in config:", count);
+        if (bytes(only).length > 0) console2.log("restricted to:", only);
 
         vm.startBroadcast();
         for (uint256 i; i < count; ++i) {
-            _createOne(json, i);
+            _createOne(json, i, only);
         }
         vm.stopBroadcast();
     }
 
-    function _createOne(string memory json, uint256 i) internal {
+    function _createOne(string memory json, uint256 i, string memory only) internal {
         string memory at = string.concat(".markets[", vm.toString(i), "]");
         string memory key = json.readString(string.concat(at, ".key"));
+        if (!_selected(only, key)) return;
 
         MarketParams memory params = MarketParams({
             loanToken: json.readAddress(string.concat(at, ".loanToken")),
@@ -79,6 +85,25 @@ contract CreateMarkets is Script {
 
         morpho.createMarket(params);
         console2.log(key, "created", vm.toString(Id.unwrap(id)));
+    }
+
+    /// @dev Substring match on a comma-wrapped list, so "NVDA" does not also select "NVDA-SHORT".
+    function _selected(string memory only, string memory key) internal pure returns (bool) {
+        if (bytes(only).length == 0) return true;
+        bytes memory haystack = bytes(string.concat(",", only, ","));
+        bytes memory needle = bytes(string.concat(",", key, ","));
+        if (needle.length > haystack.length) return false;
+        for (uint256 i; i <= haystack.length - needle.length; ++i) {
+            bool hit = true;
+            for (uint256 j; j < needle.length; ++j) {
+                if (haystack[i + j] != needle[j]) {
+                    hit = false;
+                    break;
+                }
+            }
+            if (hit) return true;
+        }
+        return false;
     }
 
     function _deployOracle(string memory json, string memory at, string memory key) internal returns (address) {

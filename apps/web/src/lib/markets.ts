@@ -84,7 +84,26 @@ async function priceOf(subject: string): Promise<{ price: number | null; age: nu
   return { price: null, age: null, source: null };
 }
 
+/**
+ * One in-flight read shared by every caller. Each page needs the same market list, and a build
+ * renders dozens of them at once — without this the same eighteen feeds get read thirty times over
+ * and the RPC starts refusing, which surfaces as an unrelated-looking viem error mid-build.
+ */
+let cached: { at: number; promise: Promise<MarketView[]> } | null = null;
+const CACHE_MS = 15_000;
+
 export async function getMarkets(): Promise<MarketView[]> {
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.promise;
+  const promise = readMarkets();
+  cached = { at: Date.now(), promise };
+  // A failed read must not be cached, or one bad moment poisons the next fifteen seconds.
+  promise.catch(() => {
+    if (cached?.promise === promise) cached = null;
+  });
+  return promise;
+}
+
+async function readMarkets(): Promise<MarketView[]> {
   const priced = new Map<string, Awaited<ReturnType<typeof priceOf>>>();
   await Promise.all(
     Array.from(new Set(marketCatalog.map(subjectOf))).map(async (s) => priced.set(s, await priceOf(s))),
@@ -134,10 +153,27 @@ export async function getMarkets(): Promise<MarketView[]> {
         };
       }
 
-      const [params, state] = await Promise.all([
+      const onChain = await Promise.all([
         getMarketParams(publicClient, marketId),
         getMarketState(publicClient, marketId),
-      ]);
+      ]).catch(() => null);
+
+      // The market exists but the node would not answer. Show it as listed with no figures rather
+      // than failing the whole page: a missing number is honest, a crashed route is not.
+      if (!onChain) {
+        return {
+          ...base,
+          status: "listed" as const,
+          totalSupplyUsd: 0,
+          totalBorrowUsd: 0,
+          liquidityUsd: 0,
+          utilization: 0,
+          borrowApr: null,
+          supplyApr: null,
+        };
+      }
+
+      const [params, state] = onChain;
       const rates = await getRates(publicClient, params, state).catch(() => null);
       const unit = 10 ** (m.loan === "USDG" ? USDG_DECIMALS : 18);
       const supply = Number(state.totalSupplyAssets) / unit;

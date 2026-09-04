@@ -400,7 +400,10 @@ export const preLiquidation = {
   incentiveFactor: { start: 1.02, end: 1.04 },
 } as const;
 
-/** Filled by the deploy scripts (contracts/broadcast). Empty until the first deploy. */
+/**
+ * Deployed on Robinhood Chain mainnet, 2026-09-04. The canary: three markets, two contracts of ours,
+ * ownership still on the deploy key until a Safe exists.
+ */
 export const deployments: {
   lens?: `0x${string}`;
   flashLiquidator?: `0x${string}`;
@@ -409,14 +412,37 @@ export const deployments: {
   merkleDistributor?: `0x${string}`;
   creditRegistry?: `0x${string}`;
   metaMorphoFactory?: `0x${string}`;
+  owner?: `0x${string}`;
   startBlock?: number;
   vaults: Record<string, `0x${string}`>;
   oracles: Record<string, `0x${string}`>;
   markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
+  lens: "0x5fC2Cd44d8caA4b3A6e330849bEbc3cA323c625b",
+  flashLiquidator: "0xDCc269c0D8e86229f32Aadf4B7937899799337b3",
+  owner: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
+  /** Block of the first Cluby deploy — where the indexer starts. */
+  startBlock: 54451901,
   vaults: {},
-  oracles: {},
-  markets: {},
+  oracles: {
+    NVDA: "0xB5736a58CE6370DaD1888d8996cf64A22e622BB8",
+    SPY: "0x1bb6b9792e9852CB7bfEB14A5951394D07817b7D",
+    ETH: "0x3b43937193b444DDa2251a9A58442cDD5e90f7fD",
+  },
+  markets: {
+    NVDA: {
+      id: "0x639f19732ce4cd54b9f3509f3acee6e8d5d20ff5e75b7c94c20808f48196d826",
+      oracle: "0xB5736a58CE6370DaD1888d8996cf64A22e622BB8",
+    },
+    SPY: {
+      id: "0xf95832e36d9d8baf35eb78ce80cbed92d20198ba639659b3f9a2ab00ced0a0c1",
+      oracle: "0x1bb6b9792e9852CB7bfEB14A5951394D07817b7D",
+    },
+    ETH: {
+      id: "0x6722f53f25a8d6e73493893c4f7f80ddc535cf97c4a93116fd55296e714216ae",
+      oracle: "0x3b43937193b444DDa2251a9A58442cDD5e90f7fD",
+    },
+  },
 };
 
 export const BPS = 10_000n;
