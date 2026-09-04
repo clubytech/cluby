@@ -7,6 +7,7 @@ const columns = [
     links: [
       { href: "/earn", label: "Earn" },
       { href: "/borrow", label: "Borrow" },
+      { href: "/stake", label: "Stake" },
       { href: "/stats", label: "Stats" },
       { href: "/portfolio", label: "Portfolio" },
     ],
@@ -15,9 +16,10 @@ const columns = [
     title: "Learn",
     links: [
       { href: "/docs", label: "Overview" },
-      { href: "/docs/risk", label: "Risk framework" },
-      { href: "/docs/withdrawals", label: "Withdrawals" },
-      { href: "/docs/flash-loans", label: "Flash loans" },
+      { href: "/docs#risk", label: "Risk framework" },
+      { href: "/docs#withdrawals", label: "Withdrawals" },
+      { href: "/docs#flash-loans", label: "Flash loans" },
+      { href: "/builders", label: "Builders" },
     ],
   },
 ];

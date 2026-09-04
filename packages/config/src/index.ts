@@ -78,78 +78,210 @@ export const external = {
   robinhoodApi: "https://api.robinhood.com/rhj",
 } as const;
 
-/** Filled by the deploy script output (contracts/broadcast). Empty until the canary deploy. */
+/**
+ * Morpho Blue stack on Robinhood Chain (4663).
+ * `verified` = `eth_getCode` returned bytecode on the public RPC (checked 2026-09-04).
+ * The vault factory, Bundler3, PreLiquidationFactory and PublicAllocator are NOT deployed at their
+ * Ethereum/Base addresses here — probed and empty — so those come from our own deploy of the
+ * Morpho sources (PLAN §2.1).
+ */
+export const morpho = {
+  blue: { address: "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010", verified: true, codeSize: 15582 },
+  adaptiveCurveIrm: { address: "0x2BD3d5965B26B51814AC95127B2b80dD6CcC0fa1", verified: true, codeSize: 2282 },
+  chainlinkOracleV2Factory: { address: "0xB7c16F6F8cF531447Bf27Ca7220f981E79C9cdF2", verified: true, codeSize: 4464 },
+  metaMorphoFactory: { address: null, verified: false },
+  vaultV2Factory: { address: null, verified: false },
+  bundler3: { address: null, verified: false },
+  preLiquidationFactory: { address: null, verified: false },
+  publicAllocator: { address: null, verified: false },
+} as const;
+
+/**
+ * Liquidation LTV tiers (PLAN §3.3 and §1A.2). Fixed before a market is created and immutable after.
+ * `megacapTwap` is the 70% tier a megacap earns once a v3 pool backs a min(feed, twap) oracle;
+ * `short` is the 66.7% that corresponds to 150% coverage on a stock-borrow market.
+ */
+export const LLTV = {
+  tbills: 860_000_000_000_000_000n,
+  eth: 770_000_000_000_000_000n,
+  megacapTwap: 700_000_000_000_000_000n,
+  short: 667_000_000_000_000_000n,
+  stock: 625_000_000_000_000_000n,
+  longTail: 385_000_000_000_000_000n,
+} as const;
+
+export type MarketTier = keyof typeof LLTV;
+export type MarketSide = "long" | "short";
+/** How the collateral is priced. `chainlinkTwapMin` takes min(feed, twap): conservative for collateral. */
+export type OracleKind = "chainlink" | "chainlinkTwapMin" | "twap" | "inverse";
+export type MarketCategory = "Stocks" | "ETF" | "T-bills" | "Crypto" | "Pre-IPO" | "Onchain-native";
+/** `listed` once createMarket has run; everything else is a market we have specified but not created. */
+export type ListingStatus = "listed" | "planned" | "blocked";
+
+export type MarketDef = {
+  key: string;
+  side: MarketSide;
+  /** What the borrower posts. */
+  collateral: string;
+  /** What the borrower takes out. */
+  loan: string;
+  tier: MarketTier;
+  oracle: OracleKind;
+  category: MarketCategory;
+  /** Supply cap in USD at listing. Raised only against measured exit depth (PLAN §3.2). */
+  supplyCapUsd: number;
+  status: ListingStatus;
+  /** Why a market is blocked, when it is. */
+  note?: string;
+};
+
+/**
+ * The market catalog (PLAN §3.3). A ticker only becomes `planned` once its token address and its
+ * price source are both known — an unverified address is worse than a gap, so the rest stay
+ * `blocked` with the reason stated, and the site says so rather than quietly dropping them.
+ */
+export const marketCatalog: MarketDef[] = [
+  // Long: borrow USDG against stock, ETF and crypto collateral.
+  { key: "NVDA", side: "long", collateral: "NVDA", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "planned" },
+  { key: "SPY", side: "long", collateral: "SPY", loan: "USDG", tier: "stock", oracle: "chainlink", category: "ETF", supplyCapUsd: 2000, status: "planned" },
+  { key: "AAPL", side: "long", collateral: "AAPL", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "planned" },
+  { key: "TSLA", side: "long", collateral: "TSLA", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 1000, status: "planned" },
+  { key: "ETH", side: "long", collateral: "WETH", loan: "USDG", tier: "eth", oracle: "chainlink", category: "Crypto", supplyCapUsd: 5000, status: "planned" },
+  { key: "HIMS", side: "long", collateral: "HIMS", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 500, status: "planned", note: "No Chainlink feed on this chain; priced by a 30–60 min v3 TWAP once cardinality is raised." },
+  { key: "MSFT", side: "long", collateral: "MSFT", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+  { key: "GOOGL", side: "long", collateral: "GOOGL", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+  { key: "AMZN", side: "long", collateral: "AMZN", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+  { key: "META", side: "long", collateral: "META", loan: "USDG", tier: "stock", oracle: "chainlink", category: "Stocks", supplyCapUsd: 1000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+  { key: "QQQ", side: "long", collateral: "QQQ", loan: "USDG", tier: "stock", oracle: "chainlink", category: "ETF", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+  { key: "SGOV", side: "long", collateral: "SGOV", loan: "USDG", tier: "tbills", oracle: "chainlink", category: "T-bills", supplyCapUsd: 2000, status: "blocked", note: "Token and feed addresses on 4663 not confirmed yet." },
+
+  // Short: post USDG, borrow the stock itself and sell it (PLAN §1A.1). Priced by an inverse oracle.
+  { key: "NVDA-SHORT", side: "short", collateral: "USDG", loan: "NVDA", tier: "short", oracle: "inverse", category: "Stocks", supplyCapUsd: 1000, status: "planned" },
+  { key: "TSLA-SHORT", side: "short", collateral: "USDG", loan: "TSLA", tier: "short", oracle: "inverse", category: "Stocks", supplyCapUsd: 1000, status: "planned" },
+];
+
+/** UI never opens a position at the very edge of LLTV (PLAN §1.2, §3.3), in percentage points. */
+export const SAFE_CAP_MARGIN: Record<MarketTier, number> = {
+  tbills: 4,
+  eth: 5,
+  megacapTwap: 5,
+  short: 6,
+  stock: 5,
+  longTail: 8,
+};
+
+/** How long a price may stand still before it stops being a normal market pause, in seconds. */
+export const FEED_MAX_AGE = {
+  /** Stock feeds are 24/5 and hold their last print across a ~65 h weekend (docs/chain-facts.md). */
+  stock: 5 * 24 * 60 * 60,
+  crypto: 24 * 60 * 60,
+} as const;
+
+export type VaultKind = "core" | "frontier" | "eth" | "stockLending" | "partner";
+
+export type VaultDef = {
+  key: string;
+  kind: VaultKind;
+  name: string;
+  symbol: string;
+  /** The asset a depositor supplies. */
+  asset: string;
+  /** Markets this vault is allowed to lend into, by catalog key. */
+  markets: string[];
+  description: string;
+  status: ListingStatus;
+};
+
+/** Earn side (PLAN §1.1 and §1A.1). Partner vaults are created per request, seeded by the partner. */
+export const vaultCatalog: VaultDef[] = [
+  {
+    key: "core-usdg",
+    kind: "core",
+    name: "Cluby Core USDG",
+    symbol: "cUSDG",
+    asset: "USDG",
+    markets: ["NVDA", "SPY", "AAPL", "TSLA", "ETH"],
+    description: "Chainlink-priced collateral only. The conservative book: megacaps, an index ETF and ETH.",
+    status: "planned",
+  },
+  {
+    key: "frontier-usdg",
+    kind: "frontier",
+    name: "Cluby Frontier USDG",
+    symbol: "fUSDG",
+    asset: "USDG",
+    markets: ["HIMS"],
+    description: "Long-tail collateral priced by TWAP. Higher rate, thinner exit, smaller caps.",
+    status: "planned",
+  },
+  {
+    key: "core-weth",
+    kind: "eth",
+    name: "Cluby ETH",
+    symbol: "cWETH",
+    asset: "WETH",
+    markets: [],
+    description: "Lend WETH against stock collateral. Opens once the USDG book has depth.",
+    status: "planned",
+  },
+  {
+    key: "lend-nvda",
+    kind: "stockLending",
+    name: "Cluby NVDA Lending",
+    symbol: "lNVDA",
+    asset: "NVDA",
+    markets: ["NVDA-SHORT"],
+    description: "Lend your NVDA to short sellers and earn the borrow rate while keeping the exposure.",
+    status: "planned",
+  },
+];
+
+/**
+ * Money flows (PLAN §3.1). Performance fee is 0 for the first 90 days after a vault opens (§1A.4),
+ * then the curve fee applies; the split below is of the fee, not of user principal.
+ */
+export const economics = {
+  performanceFeeWad: 100_000_000_000_000_000n, // 10%
+  introFeeWad: 0n,
+  introDays: 90,
+  /** Of the fee taken: to stakers, to treasury. */
+  feeSplit: { stakers: 0.75, treasury: 0.25 },
+  /** Share of interest a borrower gets back through the weekly Merkle epoch. */
+  borrowRebate: 0.1,
+  /** Share of the performance fee attributed to a builder's referred volume. */
+  builderShare: 0.5,
+  /** Creator fee on protocol-token trading routed to stakers. */
+  tokenCreatorFeeToStakers: 0.05,
+  flashLoanFee: 0,
+} as const;
+
+/** Pre-liquidation parameters (PLAN §1A.3): soft, partial unwind before the hard LIF applies. */
+export const preLiquidation = {
+  /** preLltv = LLTV − 5 pp. */
+  lltvOffsetPp: 5,
+  closeFactor: { start: 0.2, end: 1.0 },
+  incentiveFactor: { start: 1.02, end: 1.04 },
+} as const;
+
+/** Filled by the deploy scripts (contracts/broadcast). Empty until the first deploy. */
 export const deployments: {
-  market?: `0x${string}`;
-  irm?: `0x${string}`;
-  oracle?: `0x${string}`;
   lens?: `0x${string}`;
-  shortRouter?: `0x${string}`;
   flashLiquidator?: `0x${string}`;
+  leverageRouter?: `0x${string}`;
+  stakingRewards?: `0x${string}`;
+  merkleDistributor?: `0x${string}`;
+  creditRegistry?: `0x${string}`;
+  metaMorphoFactory?: `0x${string}`;
   startBlock?: number;
-  markets: Record<string, { id: `0x${string}`; symbol: StockSymbol }>;
+  vaults: Record<string, `0x${string}`>;
+  oracles: Record<string, `0x${string}`>;
+  markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
+  vaults: {},
+  oracles: {},
   markets: {},
 };
 
 export const BPS = 10_000n;
 export const ORACLE_PRICE_SCALE = 10n ** 36n;
 export const WAD = 10n ** 18n;
-
-/**
- * Morpho Blue stack on Robinhood Chain (4663).
- * `verified` = `eth_getCode` returned bytecode on the public RPC (checked 2026-09-04, block tip).
- * The vault factory, Bundler3, PreLiquidationFactory and PublicAllocator are NOT deployed at their
- * Ethereum/Base addresses on this chain — probed and empty — so a MetaMorpho V1.1 factory of our own
- * is the path to a vault (MVP block 1 fallback).
- */
-export const morpho = {
-  blue: {
-    address: "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010",
-    verified: true,
-    codeSize: 15582,
-  },
-  adaptiveCurveIrm: {
-    address: "0x2BD3d5965B26B51814AC95127B2b80dD6CcC0fa1",
-    verified: true,
-    codeSize: 2282,
-  },
-  chainlinkOracleV2Factory: {
-    address: "0xB7c16F6F8cF531447Bf27Ca7220f981E79C9cdF2",
-    verified: true,
-    codeSize: 4464,
-  },
-  /** Not found on 4663. Deploy MetaMorpho V1.1 factory from Morpho sources before the vault block. */
-  metaMorphoFactory: { address: null, verified: false },
-  bundler3: { address: null, verified: false },
-  preLiquidationFactory: { address: null, verified: false },
-} as const;
-
-/** LLTV tiers, immutable once a market is created (MVP.md rule 4). */
-export const LLTV = {
-  stock: 625_000_000_000_000_000n, // 0.625e18
-  eth: 770_000_000_000_000_000n, // 0.77e18
-  longTail: 385_000_000_000_000_000n, // 0.385e18
-} as const;
-
-export type MarketTier = "stock" | "eth" | "longTail";
-
-/** The four MVP markets. Loan token is USDG everywhere. Caps in USDG units (6 decimals). */
-export const plannedMarkets = [
-  { symbol: "NVDA", collateral: "NVDA", tier: "stock", lltv: LLTV.stock, supplyCap: 1_000_000_000n, category: "Stocks" },
-  { symbol: "SPY", collateral: "SPY", tier: "stock", lltv: LLTV.stock, supplyCap: 1_000_000_000n, category: "ETF" },
-  { symbol: "AAPL", collateral: "AAPL", tier: "stock", lltv: LLTV.stock, supplyCap: 1_000_000_000n, category: "Stocks" },
-  { symbol: "ETH", collateral: "WETH", tier: "eth", lltv: LLTV.eth, supplyCap: 2_000_000_000n, category: "Crypto" },
-] as const;
-
-/** UI never lets a position open at the very edge of LLTV. */
-export const SAFE_CAP_MARGIN = { stock: 5n, eth: 5n, longTail: 8n } as const; // percentage points
-
-/** Vault: Core USDG, performance fee 0 for the MVP (MVP.md rule 1). */
-export const vaultConfig = {
-  name: "Cluby Core USDG",
-  symbol: "cUSDG",
-  asset: "USDG",
-  performanceFeeWad: 0n,
-  initialDepositUsdg: 100_000_000n, // $100
-} as const;

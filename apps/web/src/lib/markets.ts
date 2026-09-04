@@ -1,34 +1,40 @@
 import {
+  FEED_MAX_AGE,
   LLTV,
   SAFE_CAP_MARGIN,
   deployments,
+  economics,
   external,
+  marketCatalog,
   morpho,
-  plannedMarkets,
   stocks,
   tokens,
-  vaultConfig,
+  vaultCatalog,
+  type ListingStatus,
+  type MarketDef,
+  type MarketSide,
+  type OracleKind,
 } from "@cluby/config";
 import { chainlinkFeedAbi, irmAbi, morphoBlueAbi } from "./abi";
 import { publicClient } from "./chain";
 
-export type MarketStatus = "live" | "pending";
-
 export type MarketView = {
-  symbol: string;
+  key: string;
+  side: MarketSide;
+  /** Symbol the row is named after: the collateral on a long, the borrowed stock on a short. */
+  subject: string;
   collateralSymbol: string;
-  collateralAddress: `0x${string}`;
+  loanSymbol: string;
+  collateralAddress: `0x${string}` | null;
   category: string;
-  status: MarketStatus;
-  /** 0.625 for a 62.5% market. */
+  status: ListingStatus;
+  note: string | null;
   lltv: number;
-  /** LLTV minus the UI margin — the highest LTV the app will let you open at. */
   safeLtv: number;
-  oracleKind: "chainlink" | "twap";
+  maxLeverage: number;
+  oracle: OracleKind;
   feed: `0x${string}` | null;
-  /** Collateral price in USD, straight off the Chainlink feed. Null when the feed did not answer. */
   price: number | null;
-  /** Seconds since the feed last moved. Stock feeds are 24/5 and stand still all weekend. */
   priceAge: number | null;
   priceStale: boolean;
   supplyCapUsd: number;
@@ -42,82 +48,140 @@ export type MarketView = {
 };
 
 const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
-/** A stock feed that has not moved for longer than this is past a normal weekend pause. */
-const STOCK_STALE_AFTER = 5 * 24 * 60 * 60;
-const CRYPTO_STALE_AFTER = 24 * 60 * 60;
 
 function ratePerSecondToApr(ratePerSecondWad: bigint): number {
-  const perSecond = Number(ratePerSecondWad) / 1e18;
-  // Morpho compounds continuously; APY = e^(r·t) − 1.
-  return Math.expm1(perSecond * SECONDS_PER_YEAR);
+  // Morpho accrues continuously, so the honest yearly figure is e^(r·t) − 1, not r·t.
+  return Math.expm1((Number(ratePerSecondWad) / 1e18) * SECONDS_PER_YEAR);
 }
 
-function feedFor(symbol: string): `0x${string}` | null {
-  if (symbol === "ETH") return external.ethUsdFeed as `0x${string}`;
-  const stock = stocks[symbol as keyof typeof stocks];
-  return (stock && "feed" in stock ? (stock.feed as `0x${string}`) : null) ?? null;
+function tokenAddress(symbol: string): `0x${string}` | null {
+  if (symbol in tokens) return tokens[symbol as keyof typeof tokens].address as `0x${string}`;
+  if (symbol in stocks) return stocks[symbol as keyof typeof stocks].address as `0x${string}`;
+  return null;
 }
 
-function collateralAddress(symbol: string): `0x${string}` {
-  if (symbol === "WETH") return tokens.WETH.address as `0x${string}`;
-  return stocks[symbol as keyof typeof stocks].address as `0x${string}`;
+function feedAddress(symbol: string): `0x${string}` | null {
+  if (symbol === "WETH" || symbol === "ETH") return external.ethUsdFeed as `0x${string}`;
+  const s = stocks[symbol as keyof typeof stocks];
+  if (s && "feed" in s && s.feed) return s.feed as `0x${string}`;
+  return null;
 }
+
+/** The asset whose price the row is about: what you post on a long, what you owe on a short. */
+function subjectSymbol(m: MarketDef): string {
+  return m.side === "long" ? m.collateral : m.loan;
+}
+
+const priceCache = new Map<string, { at: number; price: number | null; age: number | null }>();
 
 async function readPrice(feed: `0x${string}` | null) {
   if (!feed) return { price: null, age: null };
+  const hit = priceCache.get(feed);
+  if (hit && Date.now() - hit.at < 15_000) return { price: hit.price, age: hit.age };
   try {
     const [data, decimals] = await Promise.all([
       publicClient.readContract({ address: feed, abi: chainlinkFeedAbi, functionName: "latestRoundData" }),
       publicClient.readContract({ address: feed, abi: chainlinkFeedAbi, functionName: "decimals" }),
     ]);
     const answer = data[1];
-    const updatedAt = Number(data[3]);
-    if (answer <= 0n) return { price: null, age: null };
-    return {
+    if (answer <= 0n) throw new Error("feed has no answer");
+    const out = {
       price: Number(answer) / 10 ** Number(decimals),
-      age: Math.max(0, Math.floor(Date.now() / 1000) - updatedAt),
+      age: Math.max(0, Math.floor(Date.now() / 1000) - Number(data[3])),
     };
+    priceCache.set(feed, { at: Date.now(), ...out });
+    return out;
   } catch {
     return { price: null, age: null };
   }
 }
 
+async function readMarketState(marketId: `0x${string}`) {
+  const [params, state] = await Promise.all([
+    publicClient.readContract({
+      address: morpho.blue.address as `0x${string}`,
+      abi: morphoBlueAbi,
+      functionName: "idToMarketParams",
+      args: [marketId],
+    }),
+    publicClient.readContract({
+      address: morpho.blue.address as `0x${string}`,
+      abi: morphoBlueAbi,
+      functionName: "market",
+      args: [marketId],
+    }),
+  ]);
+
+  let borrowApr: number | null = null;
+  try {
+    const rate = await publicClient.readContract({
+      address: morpho.adaptiveCurveIrm.address as `0x${string}`,
+      abi: irmAbi,
+      functionName: "borrowRateView",
+      args: [
+        { loanToken: params[0], collateralToken: params[1], oracle: params[2], irm: params[3], lltv: params[4] },
+        {
+          totalSupplyAssets: state[0],
+          totalSupplyShares: state[1],
+          totalBorrowAssets: state[2],
+          totalBorrowShares: state[3],
+          lastUpdate: state[4],
+          fee: state[5],
+        },
+      ],
+    });
+    borrowApr = ratePerSecondToApr(rate);
+  } catch {
+    borrowApr = null;
+  }
+
+  return { state, borrowApr };
+}
+
 /**
- * One market as the site shows it. Until `CreateMarkets.s.sol` has run, a market has no id on
- * chain: everything sized in USDG reads zero and the row says "pending" — the price is still real,
- * because the Chainlink feed exists whether or not our market does.
+ * Every market in the catalog, priced live. A market that has not been created on chain still
+ * carries a real oracle price — the Chainlink feed exists whether or not our market does — but its
+ * sizes read zero and its status says why.
  */
 export async function getMarkets(): Promise<MarketView[]> {
   return Promise.all(
-    plannedMarkets.map(async (m) => {
-      const feed = feedFor(m.symbol);
-      const deployed = deployments.markets[m.symbol];
-      const marketId = (deployed?.id ?? null) as `0x${string}` | null;
+    marketCatalog.map(async (m) => {
+      const subject = subjectSymbol(m);
+      const feed = feedAddress(subject);
       const { price, age } = await readPrice(feed);
-      const lltv = Number(m.lltv) / 1e18;
-      const margin = Number(SAFE_CAP_MARGIN[m.tier as keyof typeof SAFE_CAP_MARGIN]) / 100;
-      const staleAfter = m.tier === "eth" ? CRYPTO_STALE_AFTER : STOCK_STALE_AFTER;
+      const lltv = Number(LLTV[m.tier]) / 1e18;
+      const safeLtv = Math.max(0, lltv - SAFE_CAP_MARGIN[m.tier] / 100);
+      const maxAge = m.category === "Crypto" ? FEED_MAX_AGE.crypto : FEED_MAX_AGE.stock;
+      const deployed = deployments.markets[m.key];
+      const marketId = (deployed?.id ?? null) as `0x${string}` | null;
+      const loanDecimals = m.loan === "USDG" ? 6 : 18;
 
       const base = {
-        symbol: m.symbol,
+        key: m.key,
+        side: m.side,
+        subject,
         collateralSymbol: m.collateral,
-        collateralAddress: collateralAddress(m.collateral),
+        loanSymbol: m.loan,
+        collateralAddress: tokenAddress(m.collateral),
         category: m.category,
+        note: m.note ?? null,
         lltv,
-        safeLtv: Math.max(0, lltv - margin),
-        oracleKind: "chainlink" as const,
+        safeLtv,
+        // Leverage a Multiply position can reach against this LLTV (PLAN §1.5).
+        maxLeverage: safeLtv >= 1 ? 0 : 1 / (1 - safeLtv),
+        oracle: m.oracle,
         feed,
         price,
         priceAge: age,
-        priceStale: age !== null && age > staleAfter,
-        supplyCapUsd: Number(m.supplyCap) / 1e6,
+        priceStale: age !== null && age > maxAge,
+        supplyCapUsd: m.supplyCapUsd,
         marketId,
       };
 
       if (!marketId) {
         return {
           ...base,
-          status: "pending" as const,
+          status: m.status,
           totalSupplyUsd: 0,
           totalBorrowUsd: 0,
           liquidityUsd: 0,
@@ -127,123 +191,109 @@ export async function getMarkets(): Promise<MarketView[]> {
         };
       }
 
-      const [params, state] = await Promise.all([
-        publicClient.readContract({
-          address: morpho.blue.address as `0x${string}`,
-          abi: morphoBlueAbi,
-          functionName: "idToMarketParams",
-          args: [marketId],
-        }),
-        publicClient.readContract({
-          address: morpho.blue.address as `0x${string}`,
-          abi: morphoBlueAbi,
-          functionName: "market",
-          args: [marketId],
-        }),
-      ]);
-
-      const totalSupply = Number(state[0]) / 1e6;
-      const totalBorrow = Number(state[2]) / 1e6;
-      const utilization = totalSupply === 0 ? 0 : totalBorrow / totalSupply;
-
-      let borrowApr: number | null = null;
-      try {
-        const marketParams = {
-          loanToken: params[0],
-          collateralToken: params[1],
-          oracle: params[2],
-          irm: params[3],
-          lltv: params[4],
-        };
-        const marketState = {
-          totalSupplyAssets: state[0],
-          totalSupplyShares: state[1],
-          totalBorrowAssets: state[2],
-          totalBorrowShares: state[3],
-          lastUpdate: state[4],
-          fee: state[5],
-        };
-        const rate = await publicClient.readContract({
-          address: morpho.adaptiveCurveIrm.address as `0x${string}`,
-          abi: irmAbi,
-          functionName: "borrowRateView",
-          args: [marketParams, marketState],
-        });
-        borrowApr = ratePerSecondToApr(rate);
-      } catch {
-        borrowApr = null;
-      }
+      const { state, borrowApr } = await readMarketState(marketId);
+      const unit = 10 ** loanDecimals;
+      const supply = Number(state[0]) / unit;
+      const borrow = Number(state[2]) / unit;
+      // A stock-denominated market is sized in shares; value it with the same oracle price.
+      const toUsd = m.loan === "USDG" ? 1 : (price ?? 0);
+      const utilization = supply === 0 ? 0 : borrow / supply;
+      const feeShare = 1 - Number(economics.introFeeWad) / 1e18;
 
       return {
         ...base,
-        status: "live" as const,
-        totalSupplyUsd: totalSupply,
-        totalBorrowUsd: totalBorrow,
-        liquidityUsd: Math.max(0, totalSupply - totalBorrow),
+        status: "listed" as const,
+        totalSupplyUsd: supply * toUsd,
+        totalBorrowUsd: borrow * toUsd,
+        liquidityUsd: Math.max(0, (supply - borrow) * toUsd),
         utilization,
         borrowApr,
-        // Suppliers earn the borrow rate scaled by utilization; the vault fee is 0 for the MVP.
-        supplyApr: borrowApr === null ? null : borrowApr * utilization,
+        supplyApr: borrowApr === null ? null : borrowApr * utilization * feeShare,
       };
     }),
   );
 }
 
 export type VaultView = {
+  key: string;
+  kind: string;
   name: string;
   symbol: string;
   asset: string;
-  status: MarketStatus;
+  description: string;
+  status: ListingStatus;
   address: `0x${string}` | null;
   performanceFee: number;
+  introFeeDays: number;
   totalAssetsUsd: number;
   withdrawableUsd: number;
   apy: number | null;
-  markets: string[];
+  markets: MarketView[];
 };
 
 export async function getVaults(): Promise<VaultView[]> {
   const markets = await getMarkets();
-  const live = markets.filter((m) => m.status === "live");
-  const totalSupply = live.reduce((a, m) => a + m.totalSupplyUsd, 0);
-  const withdrawable = live.reduce((a, m) => a + m.liquidityUsd, 0);
-  const weightedApy =
-    totalSupply === 0
-      ? null
-      : live.reduce((a, m) => a + (m.supplyApr ?? 0) * m.totalSupplyUsd, 0) / totalSupply;
+  const byKey = new Map(markets.map((m) => [m.key, m]));
 
-  return [
-    {
-      name: vaultConfig.name,
-      symbol: vaultConfig.symbol,
-      asset: vaultConfig.asset,
-      status: live.length > 0 ? "live" : "pending",
-      address: null,
-      performanceFee: Number(vaultConfig.performanceFeeWad) / 1e18,
-      totalAssetsUsd: totalSupply,
+  return vaultCatalog.map((v) => {
+    const mine = v.markets.map((k) => byKey.get(k)).filter((m): m is MarketView => Boolean(m));
+    const listed = mine.filter((m) => m.status === "listed");
+    const totalAssets = listed.reduce((a, m) => a + m.totalSupplyUsd, 0);
+    const withdrawable = listed.reduce((a, m) => a + m.liquidityUsd, 0);
+    const apy =
+      totalAssets === 0
+        ? null
+        : listed.reduce((a, m) => a + (m.supplyApr ?? 0) * m.totalSupplyUsd, 0) / totalAssets;
+
+    return {
+      key: v.key,
+      kind: v.kind,
+      name: v.name,
+      symbol: v.symbol,
+      asset: v.asset,
+      description: v.description,
+      status: listed.length > 0 ? ("listed" as const) : v.status,
+      address: (deployments.vaults[v.key] ?? null) as `0x${string}` | null,
+      performanceFee: Number(economics.introFeeWad) / 1e18,
+      introFeeDays: economics.introDays,
+      totalAssetsUsd: totalAssets,
       withdrawableUsd: withdrawable,
-      apy: weightedApy,
-      markets: markets.map((m) => m.symbol),
-    },
-  ];
+      apy,
+      markets: mine,
+    };
+  });
 }
 
 export async function getProtocolStats() {
   const markets = await getMarkets();
+  const longs = markets.filter((m) => m.side === "long");
+  const shorts = markets.filter((m) => m.side === "short");
   const totalSupplyUsd = markets.reduce((a, m) => a + m.totalSupplyUsd, 0);
   const totalBorrowUsd = markets.reduce((a, m) => a + m.totalBorrowUsd, 0);
+
   return {
     chainId: 4663,
     totalSupplyUsd,
     totalBorrowUsd,
     liquidityUsd: totalSupplyUsd - totalBorrowUsd,
+    utilization: totalSupplyUsd === 0 ? 0 : totalBorrowUsd / totalSupplyUsd,
     marketCount: markets.length,
-    liveMarketCount: markets.filter((m) => m.status === "live").length,
+    listedCount: markets.filter((m) => m.status === "listed").length,
+    plannedCount: markets.filter((m) => m.status === "planned").length,
+    blockedCount: markets.filter((m) => m.status === "blocked").length,
+    longCount: longs.length,
+    shortCount: shorts.length,
+    shortInterestUsd: shorts.reduce((a, m) => a + m.totalBorrowUsd, 0),
     capUsd: markets.reduce((a, m) => a + m.supplyCapUsd, 0),
-    lltvTiers: {
-      stock: Number(LLTV.stock) / 1e18,
-      eth: Number(LLTV.eth) / 1e18,
-      longTail: Number(LLTV.longTail) / 1e18,
+    feedsAnswering: markets.filter((m) => m.price !== null).length,
+    lltvTiers: Object.fromEntries(Object.entries(LLTV).map(([k, v]) => [k, Number(v) / 1e18])),
+    economics: {
+      performanceFee: Number(economics.performanceFeeWad) / 1e18,
+      introFee: Number(economics.introFeeWad) / 1e18,
+      introDays: economics.introDays,
+      borrowRebate: economics.borrowRebate,
+      builderShare: economics.builderShare,
+      flashLoanFee: economics.flashLoanFee,
     },
     contracts: {
       morphoBlue: morpho.blue.address,

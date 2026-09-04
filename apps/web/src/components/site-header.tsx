@@ -8,9 +8,11 @@ import { useState } from "react";
 const nav = [
   { href: "/earn", label: "Earn" },
   { href: "/borrow", label: "Borrow" },
+  { href: "/stake", label: "Stake" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/stats", label: "Stats" },
   { href: "/docs", label: "Docs" },
+  { href: "/builders", label: "Builders" },
 ];
 
 export function SiteHeader() {
@@ -27,14 +29,14 @@ export function SiteHeader() {
               <span className="text-[17px] font-semibold tracking-tight">Cluby</span>
             </Link>
 
-            <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 xl:flex">
+            <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex">
               {nav.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`rounded-full px-4 py-2 text-sm transition-colors ${
+                    className={`rounded-full px-3.5 py-2 text-sm transition-colors ${
                       active
                         ? "bg-white/10 text-text-white"
                         : "text-text-faint hover:bg-white/5 hover:text-text-white"

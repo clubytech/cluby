@@ -9,6 +9,7 @@ export const revalidate = 30;
 export default async function Home() {
   const [markets, stats] = await Promise.all([getMarkets(), getProtocolStats()]);
   const priced = markets.filter((m) => m.price !== null);
+  const longs = markets.filter((m) => m.side === "long");
 
   return (
     <>
@@ -56,7 +57,7 @@ export default async function Home() {
         <div className="relative mx-auto w-full max-w-6xl px-4 md:px-6">
           <div className="rounded-t-2xl border border-b-0 border-white/50 bg-white">
             <div className="flex flex-col divide-y divide-black/[0.06] sm:flex-row sm:divide-x sm:divide-y-0">
-              <Stat label="Markets" value={`${stats.liveMarketCount}/${stats.marketCount}`} sub="live / planned" />
+              <Stat label="Markets" value={`${stats.listedCount}/${stats.marketCount}`} sub="live / planned" />
               <Stat label="Supplied" value={usd(stats.totalSupplyUsd)} sub="USDG in Morpho" />
               <Stat label="Borrowed" value={usd(stats.totalBorrowUsd)} sub="against stock collateral" />
               <Stat label="Performance fee" value="0%" sub="for the first markets" />
@@ -105,12 +106,12 @@ export default async function Home() {
       <section className="bg-bg-weak/60">
         <div className="container-padding section-y flex flex-col gap-8">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <SectionHeading align="left" title="Markets" lead="Four to start. Immutable once created — LLTV and oracle are fixed at creation." />
+            <SectionHeading align="left" title="Markets" lead="Isolated and immutable: LLTV and oracle are fixed when a market is created and can never be edited." />
             <p className="num text-xs text-text-soft">
               {priced.length} of {markets.length} feeds answering
             </p>
           </div>
-          <MarketTable markets={markets} />
+          <MarketTable markets={longs} showFilters={false} />
           <div className="flex justify-center">
             <Button href="/borrow" variant="dark">
               See all markets
@@ -147,10 +148,10 @@ export default async function Home() {
           </div>
           <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
             {[
-              ["Liquidation LTV", `${pct(stats.lltvTiers.stock, 1)} stocks · ${pct(stats.lltvTiers.eth, 0)} ETH`],
+              ["Liquidation LTV", `${pct(stats.lltvTiers.stock, 1)} stocks · ${pct(stats.lltvTiers.tbills, 0)} T-bills`],
               ["Supply caps", `${usd(stats.capUsd, 0)} total, raised by hand`],
               ["Oracles", "Chainlink feeds, 24/5, watched off chain"],
-              ["Vault fee", "0% — nothing is skimmed yet"],
+              ["Vault fee", `${pct(stats.economics.introFee, 0)} for the first ${stats.economics.introDays} days`],
             ].map(([label, value]) => (
               <div key={label} className="rounded-[28px] border border-line-dark p-6">
                 <p className="text-[11px] uppercase tracking-widest text-white/50">{label}</p>
