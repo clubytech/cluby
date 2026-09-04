@@ -51,7 +51,9 @@ robinhood_testnet = "https://rpc.testnet.chain.robinhood.com"
 [profile.deploy]
 via_ir = true
 optimizer_runs = 1000
-skip = []
+# Scripts that drive vendored sources pin those sources' compilers; they build under their own
+# profiles (vault, preliq). This one is for our 0.8.28 tree.
+skip = ["script/DeployVaultFactory*", "script/CreateVault*", "script/CreatePartnerVault*", "script/DeployPreLiquidation*", "script/CreatePreLiquidations*", "test/fork/Vault*", "test/fork/PreLiquidation*"]
 
 # MetaMorpho V1.1 is vendored from morpho-org/metamorpho-v1.1 and pins `pragma solidity 0.8.26`
 # exactly, so it cannot build under the 0.8.28 pin the rest of the tree uses. Its own profile lets
@@ -68,7 +70,23 @@ lint_on_build = false
 solc_version = "0.8.26"
 via_ir = true
 optimizer_runs = 200
-skip = ["src/**", "test/unit/**", "test/fork/MorphoStack*", "test/fork/Leverage*", "test/fork/PreLiquidation*", "test/mocks/**", "script/CreateMarkets*", "script/DeployCore*", "script/SeedMarket*", "script/SetupForkMarket*", "script/DeployPreLiquidation*", "script/CreatePreLiquidations*"]
+skip = [
+  # Everything that is not the MetaMorpho sources or the scripts that drive them. Each vendored
+  # dependency pins its own compiler, so the profiles have to fence each other off explicitly.
+  "src/**",
+  "test/unit/**",
+  "test/mocks/**",
+  "test/fork/MorphoStack*",
+  "test/fork/Leverage*",
+  "test/fork/PreLiquidation*",
+  "script/CreateMarkets*",
+  "script/DeployCore*",
+  "script/SeedMarket*",
+  "script/SetupForkMarket*",
+  "script/TransferOwnership*",
+  "script/DeployPreLiquidation*",
+  "script/CreatePreLiquidations*",
+]
 # The vendored sources import OpenZeppelin by relative path, expecting a copy inside their own lib/.
 # Remapping it to the one we already have avoids a second 30 MB checkout that would then need
 # keeping in step.
@@ -88,7 +106,24 @@ solc_version = "0.8.27"
 # Morpho builds these with the IR pipeline; the legacy codegen cannot fit PreLiquidation's locals.
 via_ir = true
 optimizer_runs = 200
-skip = ["src/**", "test/unit/**", "test/fork/MorphoStack*", "test/fork/Leverage*", "test/fork/Vault*", "test/mocks/**", "script/CreateMarkets*", "script/DeployCore*", "script/SeedMarket*", "script/SetupForkMarket*", "script/DeployVaultFactory*", "script/CreateVault*"]
+skip = [
+  # Everything that is not the pre-liquidation sources or the scripts driving them. Each vendored
+  # dependency pins its own compiler, so the profiles fence each other off explicitly.
+  "src/**",
+  "test/unit/**",
+  "test/mocks/**",
+  "test/fork/MorphoStack*",
+  "test/fork/Leverage*",
+  "test/fork/Vault*",
+  "script/CreateMarkets*",
+  "script/DeployCore*",
+  "script/SeedMarket*",
+  "script/SetupForkMarket*",
+  "script/TransferOwnership*",
+  "script/DeployVaultFactory*",
+  "script/CreateVault*",
+  "script/CreatePartnerVault*",
+]
 remappings = [
   "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
   "forge-std/=lib/forge-std/src/",
