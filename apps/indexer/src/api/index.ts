@@ -96,6 +96,12 @@ app.get("/oracle/divergence", async (c) => {
   return reply(c, rows);
 });
 
+/** Volume each builder claims to have routed, most first. A claim, not a proof — see the SDK. */
+app.get("/builders", async (c) => {
+  const rows = await db.select().from(schema.builder).orderBy(desc(schema.builder.referredVolume));
+  return reply(c, rows);
+});
+
 app.get("/stats", async (c) => {
   const [markets, vaults, liquidations] = await Promise.all([
     db.select().from(schema.market),

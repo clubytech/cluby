@@ -68,7 +68,7 @@ lint_on_build = false
 solc_version = "0.8.26"
 via_ir = true
 optimizer_runs = 200
-skip = ["src/**", "test/unit/**", "test/fork/MorphoStack*", "test/mocks/**", "script/CreateMarkets*", "script/DeployCore*", "script/SeedMarket*", "script/SetupForkMarket*"]
+skip = ["src/**", "test/unit/**", "test/fork/MorphoStack*", "test/fork/Leverage*", "test/fork/PreLiquidation*", "test/mocks/**", "script/CreateMarkets*", "script/DeployCore*", "script/SeedMarket*", "script/SetupForkMarket*", "script/DeployPreLiquidation*", "script/CreatePreLiquidations*"]
 # The vendored sources import OpenZeppelin by relative path, expecting a copy inside their own lib/.
 # Remapping it to the one we already have avoids a second 30 MB checkout that would then need
 # keeping in step.

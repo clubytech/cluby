@@ -1,5 +1,25 @@
 import { deployments } from "@cluby/config";
 
+export type BuilderRow = { id: `0x${string}`; label: string | null; referredVolume: number; feeEarned: number };
+
+/** Volume builders claim to have routed. Null when there is no indexer to ask. */
+export async function getBuilders(): Promise<BuilderRow[] | null> {
+  if (!INDEXER) return null;
+  try {
+    const r = await fetch(`${INDEXER}/builders`, { next: { revalidate: 60 } });
+    if (!r.ok) return null;
+    const rows = (await r.json()) as { id: string; label: string | null; referredVolume: string; feeEarned: string }[];
+    return rows.map((b) => ({
+      id: b.id as `0x${string}`,
+      label: b.label,
+      referredVolume: Number(b.referredVolume) / 1e6,
+      feeEarned: Number(b.feeEarned) / 1e6,
+    }));
+  } catch {
+    return null;
+  }
+}
+
 export type Snapshot = {
   timestamp: number;
   supplyAssets: number;

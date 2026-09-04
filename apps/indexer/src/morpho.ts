@@ -1,6 +1,8 @@
 import { ponder } from "ponder:registry";
 import { market, position, txEvent, liquidation } from "ponder:schema";
 import { marketCatalog, deployments } from "@cluby/config";
+import { referrerFromCalldata } from "@cluby/sdk";
+import { builder } from "ponder:schema";
 
 /** Reverse the deploy record so an id can name itself in the API. */
 const keyOf = (id: string) =>
@@ -83,6 +85,7 @@ ponder.on("MorphoBlue:CreateMarket", async ({ event, context }) => {
 
 ponder.on("MorphoBlue:Supply", async ({ event, context }) => {
   const ts = Number(event.block.timestamp);
+  await creditBuilder(context, event.transaction.input, event.args.assets, ts);
   await bumpMarket(context, event.args.id, { totalSupplyAssets: event.args.assets, totalSupplyShares: event.args.shares }, ts);
   await touchPosition(context, event.args.id, event.args.onBehalf, ts, { supplyShares: event.args.shares });
   await context.db.insert(txEvent).values({
@@ -117,8 +120,34 @@ ponder.on("MorphoBlue:Withdraw", async ({ event, context }) => {
   });
 });
 
+/**
+ * Credit a builder for volume they routed. The address rides along as a calldata suffix, so this is
+ * a claim rather than a proof — payouts are decided against the registered list, off chain.
+ */
+async function creditBuilder(context: any, input: `0x${string}`, volume: bigint, ts: number) {
+  const referrer = referrerFromCalldata(input);
+  if (!referrer || volume === 0n) return;
+
+  const existing = await context.db.find(builder, { id: referrer });
+  if (!existing) {
+    await context.db.insert(builder).values({
+      id: referrer,
+      label: null,
+      referredVolume: volume,
+      feeEarned: 0n,
+      updatedAt: ts,
+    });
+    return;
+  }
+  await context.db.update(builder, { id: referrer }).set((row: any) => ({
+    referredVolume: row.referredVolume + volume,
+    updatedAt: ts,
+  }));
+}
+
 ponder.on("MorphoBlue:Borrow", async ({ event, context }) => {
   const ts = Number(event.block.timestamp);
+  await creditBuilder(context, event.transaction.input, event.args.assets, ts);
   await bumpMarket(context, event.args.id, { totalBorrowAssets: event.args.assets, totalBorrowShares: event.args.shares }, ts);
   await touchPosition(context, event.args.id, event.args.onBehalf, ts, { borrowShares: event.args.shares });
   await context.db.insert(txEvent).values({

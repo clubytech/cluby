@@ -1,12 +1,13 @@
 import { getProtocolStats } from "@/lib/markets";
-import { pct } from "@/lib/format";
+import { getBuilders } from "@/lib/series";
+import { pct, usd } from "@/lib/format";
 import { Card, SectionHeading } from "@/components/ui";
 
 export const revalidate = 300;
 export const metadata = { title: "Builders — Cluby" };
 
 export default async function BuildersPage() {
-  const stats = await getProtocolStats();
+  const [stats, builders] = await Promise.all([getProtocolStats(), getBuilders()]);
 
   return (
     <>
@@ -48,6 +49,48 @@ export default async function BuildersPage() {
 
       <section className="bg-bg-weak/60">
         <div className="container-padding section-y flex flex-col gap-6">
+          <Card className="bg-white">
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Attribution</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
+              A builder&apos;s address rides along as twenty bytes appended to the call. Solidity
+              ignores bytes past the arguments it expects, so it reaches the chain, costs only
+              calldata gas, and changes nothing about how the transaction executes. The alternative —
+              a referrer argument — would put a contract of ours in the path of every deposit and
+              loan to collect a marketing statistic.
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
+              A suffix is a claim, not a proof: anyone can append any address to their own
+              transaction. What is paid is settled against the registered list.
+            </p>
+
+            {builders === null ? (
+              <p className="num mt-6 text-xs text-text-soft">Indexer offline — no attribution to show.</p>
+            ) : builders.length === 0 ? (
+              <p className="num mt-6 text-xs text-text-soft">No routed volume yet.</p>
+            ) : (
+              <div className="mt-6 overflow-x-auto">
+                <table className="w-full min-w-[520px] text-left">
+                  <thead>
+                    <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">
+                      <th className="py-3 font-normal">Builder</th>
+                      <th className="py-3 font-normal">Routed volume</th>
+                      <th className="py-3 font-normal">Fee earned</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {builders.map((b) => (
+                      <tr key={b.id} className="border-b border-line/70 last:border-0">
+                        <td className="num py-3 text-xs">{b.label ?? b.id}</td>
+                        <td className="num py-3 text-sm">{usd(b.referredVolume)}</td>
+                        <td className="num py-3 text-sm">{usd(b.feeEarned)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
           <Card className="bg-white">
             <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Free flash loans</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
