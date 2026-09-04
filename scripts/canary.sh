@@ -36,8 +36,16 @@ say() { printf "\n\033[1m==> %s\033[0m\n" "$1"; }
 send() {
   local label="$1"; shift
   for attempt in 1 2 3; do
-    if out=$(cast send "$@" --private-key "$PRIVATE_KEY" --gas-limit 300000 --gas-price 2gwei 2>&1); then
-      return 0
+    # The limit is a ceiling, not a charge: unused gas is never billed, so it is set generously.
+    # A deposit that allocates into a market costs ~354k, and the 300k this script first used ran
+    # out of gas — which looks exactly like a revert unless you read the receipt.
+    if out=$(cast send "$@" --private-key "$PRIVATE_KEY" --gas-limit 1500000 --gas-price 2gwei 2>&1); then
+      if echo "$out" | grep -q "status *1"; then
+        return 0
+      fi
+      echo "  $label: mined but reverted"
+      echo "$out" | grep -E "^status|transactionHash" | head -2
+      return 1
     fi
     echo "  $label: attempt $attempt failed — $(echo "$out" | grep -oE 'error code [-0-9]+: .*' | head -1)"
     sleep 3
@@ -51,31 +59,32 @@ say "Before"
 python3 - "$(cast call $USDG 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" \
           "$(cast call $NVDA 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" <<'PY'
 import sys
-u,n=[int(x) for x in sys.argv[1:3]]
+u,n=[int(x or 0) for x in sys.argv[1:3]]
 print(f"  wallet {u/1e6:,.2f} USDG · {n/1e18:.6f} NVDA")
 PY
 
 say "1/4  approve the vault for $DEPOSIT USDG"
-send "approve vault" "$USDG" "approve(address,uint256)" "$VAULT" "$DEP_UNITS" >/dev/null
+send "approve vault" "$USDG" "approve(address,uint256)" "$VAULT" "$DEP_UNITS"
 say "2/4  deposit $DEPOSIT USDG"
-send "deposit" "$VAULT" "deposit(uint256,address)" "$DEP_UNITS" "$DEPLOYER" >/dev/null
+send "deposit" "$VAULT" "deposit(uint256,address)" "$DEP_UNITS" "$DEPLOYER"
 echo "  vault now holds $(cast call $VAULT 'totalAssets()(uint256)' | awk '{printf "%.2f", $1/1e6}') USDG"
 
 say "3/4  approve Morpho for $COLLATERAL NVDA"
-send "approve Morpho" "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS" >/dev/null
+send "approve Morpho" "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS"
 
 say "4/4  post collateral and borrow $BORROW USDG"
-MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
+(cd contracts && MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
   FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
   --rpc-url "$ROBINHOOD_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast --slow \
-  --with-gas-price 2gwei --root contracts 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
+  --with-gas-price 2gwei) 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
 
 say "After"
 python3 - "$(cast call $USDG 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" \
           "$(cast call $VAULT 'balanceOf(address)(uint256)' $DEPLOYER | awk '{print $1}')" \
           "$(cast call $VAULT 'totalAssets()(uint256)' | awk '{print $1}')" <<'PY'
 import sys
-u,sh,ta=[int(x) for x in sys.argv[1:4]]
+# This node returns an empty answer now and then; an empty read is zero here, not a crash.
+u,sh,ta=[int(x or 0) for x in sys.argv[1:4]]
 print(f"  wallet {u/1e6:,.2f} USDG")
 print(f"  vault shares {sh/1e18:.6f}, vault holds {ta/1e6:,.2f} USDG")
 PY
