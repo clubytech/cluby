@@ -122,6 +122,12 @@ app.get("/points/:address", async (c) => {
   });
 });
 
+/** Scores, worst first — the list a rebate epoch is built from. */
+app.get("/scores", async (c) => {
+  const rows = await db.select().from(schema.creditScore).orderBy(desc(schema.creditScore.score)).limit(500);
+  return reply(c, rows);
+});
+
 app.get("/points", async (c) => {
   const rows = await db.select().from(schema.points).limit(500);
   const now = Math.floor(Date.now() / 1000);

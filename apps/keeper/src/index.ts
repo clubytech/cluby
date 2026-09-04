@@ -9,6 +9,7 @@ import { alert } from "./alerts.ts";
 import { refreshBorrowers } from "./borrowers.ts";
 import { scanHealth, tryLiquidate, warnIfClose } from "./liquidate.ts";
 import { watchdogPass } from "./watchdog.ts";
+import { scorePass } from "./scores.ts";
 import { LENS, LIQUIDATOR, POLL_MS, WATCHDOG_MS, account, log } from "./env.ts";
 
 const WAD = 10n ** 18n;
@@ -54,6 +55,10 @@ async function main() {
   // forked or slow endpoint a price sweep across every market can take tens of seconds.
   void safely("watchdog", watchdogPass);
   setInterval(() => void safely("watchdog", watchdogPass), WATCHDOG_MS);
+
+  // Scores move slowly and cost gas to publish, so they go out once an hour at most.
+  void safely("scores", scorePass);
+  setInterval(() => void safely("scores", scorePass), Number(process.env.SCORE_MS ?? 3_600_000));
 
   for (;;) {
     await safely("liquidation", liquidationPass);

@@ -130,13 +130,18 @@ export const feedTick = onchainTable(
   (tbl) => ({ bySymbol: index().on(tbl.symbol, tbl.timestamp) }),
 );
 
+/**
+ * Behaviour, per borrower. Every field here is something the chain shows directly — repaid minus
+ * borrowed is the closest honest measure of interest a user actually paid, since Morpho accrues
+ * interest per market rather than per account.
+ */
 export const creditScore = onchainTable("credit_score", (t) => ({
   id: t.hex().primaryKey(), // user
   score: t.integer().notNull(),
   borrowVolume: t.bigint().notNull(),
-  interestPaid: t.bigint().notNull(),
+  repaidVolume: t.bigint().notNull(),
   liquidations: t.integer().notNull(),
-  daysActive: t.integer().notNull(),
+  firstSeenAt: t.integer().notNull(),
   updatedAt: t.integer().notNull(),
 }));
 

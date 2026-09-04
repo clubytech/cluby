@@ -430,6 +430,8 @@ export const deployments: {
    */
   flashLiquidator: "0x91B3c5b8C76386A8293B1CE97fE8dceB10733F5B",
   leverageRouter: "0xBF6cdE3F772cB3939dFCc313AA4E83C3452bab6B",
+  /** Scores only; it moves what a borrower is paid, never what they may borrow. */
+  creditRegistry: "0x86e8f3Bf88087774a530d70FfaD19b5257054E53",
   owner: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
   /** Block of the first Cluby deploy — where the indexer starts. */
   startBlock: 54451901,

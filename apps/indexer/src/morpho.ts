@@ -2,6 +2,7 @@ import { ponder } from "ponder:registry";
 import { market, position, txEvent, liquidation } from "ponder:schema";
 import { marketCatalog, deployments } from "@cluby/config";
 import { referrerFromCalldata } from "@cluby/sdk";
+import { recordAndScore } from "./score.ts";
 import { builder, points } from "ponder:schema";
 
 /** Reverse the deploy record so an id can name itself in the API. */
@@ -187,6 +188,7 @@ async function creditBuilder(context: any, input: `0x${string}`, volume: bigint,
 ponder.on("MorphoBlue:Borrow", async ({ event, context }) => {
   const ts = Number(event.block.timestamp);
   await creditBuilder(context, event.transaction.input, event.args.assets, ts);
+  await recordAndScore(context, event.args.onBehalf, ts, { borrowed: event.args.assets });
   await bumpMarket(context, event.args.id, { totalBorrowAssets: event.args.assets, totalBorrowShares: event.args.shares }, ts);
   await touchPosition(context, event.args.id, event.args.onBehalf, ts, { borrowShares: event.args.shares });
   await context.db.insert(txEvent).values({
@@ -205,6 +207,7 @@ ponder.on("MorphoBlue:Borrow", async ({ event, context }) => {
 
 ponder.on("MorphoBlue:Repay", async ({ event, context }) => {
   const ts = Number(event.block.timestamp);
+  await recordAndScore(context, event.args.onBehalf, ts, { repaid: event.args.assets });
   await bumpMarket(context, event.args.id, { totalBorrowAssets: -event.args.assets, totalBorrowShares: -event.args.shares }, ts);
   await touchPosition(context, event.args.id, event.args.onBehalf, ts, { borrowShares: -event.args.shares });
   await context.db.insert(txEvent).values({
@@ -257,6 +260,7 @@ ponder.on("MorphoBlue:WithdrawCollateral", async ({ event, context }) => {
 
 ponder.on("MorphoBlue:Liquidate", async ({ event, context }) => {
   const ts = Number(event.block.timestamp);
+  await recordAndScore(context, event.args.borrower, ts, { repaid: event.args.repaidAssets, liquidated: true });
   const keeper = (process.env.KEEPER_ADDRESS ?? "").toLowerCase();
   await context.db.insert(liquidation).values({
     id: eventId(event.transaction.hash, event.log.logIndex),

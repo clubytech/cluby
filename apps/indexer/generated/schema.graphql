@@ -956,9 +956,9 @@ type creditScore {
   id: String!
   score: Int!
   borrowVolume: BigInt!
-  interestPaid: BigInt!
+  repaidVolume: BigInt!
   liquidations: Int!
-  daysActive: Int!
+  firstSeenAt: Int!
   updatedAt: Int!
 }
 
@@ -997,14 +997,14 @@ input creditScoreFilter {
   borrowVolume_lt: BigInt
   borrowVolume_gte: BigInt
   borrowVolume_lte: BigInt
-  interestPaid: BigInt
-  interestPaid_not: BigInt
-  interestPaid_in: [BigInt]
-  interestPaid_not_in: [BigInt]
-  interestPaid_gt: BigInt
-  interestPaid_lt: BigInt
-  interestPaid_gte: BigInt
-  interestPaid_lte: BigInt
+  repaidVolume: BigInt
+  repaidVolume_not: BigInt
+  repaidVolume_in: [BigInt]
+  repaidVolume_not_in: [BigInt]
+  repaidVolume_gt: BigInt
+  repaidVolume_lt: BigInt
+  repaidVolume_gte: BigInt
+  repaidVolume_lte: BigInt
   liquidations: Int
   liquidations_not: Int
   liquidations_in: [Int]
@@ -1013,14 +1013,14 @@ input creditScoreFilter {
   liquidations_lt: Int
   liquidations_gte: Int
   liquidations_lte: Int
-  daysActive: Int
-  daysActive_not: Int
-  daysActive_in: [Int]
-  daysActive_not_in: [Int]
-  daysActive_gt: Int
-  daysActive_lt: Int
-  daysActive_gte: Int
-  daysActive_lte: Int
+  firstSeenAt: Int
+  firstSeenAt_not: Int
+  firstSeenAt_in: [Int]
+  firstSeenAt_not_in: [Int]
+  firstSeenAt_gt: Int
+  firstSeenAt_lt: Int
+  firstSeenAt_gte: Int
+  firstSeenAt_lte: Int
   updatedAt: Int
   updatedAt_not: Int
   updatedAt_in: [Int]
