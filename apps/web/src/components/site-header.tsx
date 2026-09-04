@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { ConnectButton } from "./connect-button";
 
 const nav = [
   { href: "/earn", label: "Earn" },
@@ -52,12 +53,7 @@ export function SiteHeader() {
               <span className="num rounded-full border border-line-dark px-3 py-1.5 text-[11px] uppercase tracking-widest text-text-faint">
                 Robinhood Chain
               </span>
-              <Link
-                href="/borrow"
-                className="rounded-full bg-brand-bright px-5 py-2 text-sm font-medium text-bg-deep transition-colors hover:bg-white"
-              >
-                Open app
-              </Link>
+              <ConnectButton compact />
             </div>
 
             <button
@@ -83,13 +79,9 @@ export function SiteHeader() {
                   {item.label}
                 </Link>
               ))}
-              <Link
-                href="/borrow"
-                onClick={() => setOpen(false)}
-                className="mt-2 rounded-full bg-brand-bright px-5 py-3 text-center text-sm font-medium text-bg-deep"
-              >
-                Open app
-              </Link>
+              <div className="mt-2 flex justify-center">
+                <ConnectButton />
+              </div>
             </nav>
           )}
         </div>

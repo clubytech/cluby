@@ -148,6 +148,10 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
             safeLtv={market.safeLtv}
             maxLeverage={market.maxLeverage}
             status={market.status}
+            marketId={market.marketId}
+            collateralAddress={market.collateralAddress}
+            collateralDecimals={market.collateralSymbol === "USDG" ? 6 : 18}
+            loanDecimals={market.loanSymbol === "USDG" ? 6 : 18}
           />
         </div>
       </section>

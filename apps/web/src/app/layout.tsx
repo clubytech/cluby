@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, IBM_Plex_Serif, IBM_Plex_Mono } from "next/font/google";
+import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
@@ -36,9 +37,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${inter.variable} ${serif.variable} ${mono.variable} antialiased`}
         style={{ background: "#ffffff" }}
       >
-        <SiteHeader />
-        <main>{children}</main>
-        <SiteFooter />
+        <Providers>
+          <SiteHeader />
+          <main>{children}</main>
+          <SiteFooter />
+        </Providers>
       </body>
     </html>
   );

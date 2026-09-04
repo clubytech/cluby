@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
+import { erc20Abi, morphoBlueAbi } from "@cluby/sdk";
+import { morpho } from "@cluby/config";
 import { pct, usd } from "@/lib/format";
 import { healthFactor, liquidationPrice, leveragePlan } from "@/lib/position-math";
+import { useTx } from "@/lib/use-tx";
+import { ConnectButton } from "./connect-button";
 
 type Props = {
   side: "long" | "short";
@@ -13,15 +18,51 @@ type Props = {
   safeLtv: number;
   maxLeverage: number;
   status: "listed" | "planned" | "blocked";
+  marketId: `0x${string}` | null;
+  collateralAddress: `0x${string}` | null;
+  collateralDecimals: number;
+  loanDecimals: number;
 };
 
 const tabs = ["Borrow", "Multiply"] as const;
+const BLUE = morpho.blue.address as `0x${string}`;
 
 export function PositionPanel(p: Props) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("Borrow");
   const [collateral, setCollateral] = useState(1000);
   const [ltv, setLtv] = useState(Math.round(p.safeLtv * 100 * 0.6));
   const [leverage, setLeverage] = useState(2);
+
+  const { address, isConnected } = useAccount();
+  const { run, busy } = useTx();
+
+  const { data: onChain } = useReadContracts({
+    contracts:
+      p.marketId && p.collateralAddress
+        ? [
+            { address: BLUE, abi: morphoBlueAbi, functionName: "idToMarketParams", args: [p.marketId] },
+            {
+              address: p.collateralAddress,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [address ?? "0x0000000000000000000000000000000000000000"],
+            },
+            {
+              address: p.collateralAddress,
+              abi: erc20Abi,
+              functionName: "allowance",
+              args: [address ?? "0x0000000000000000000000000000000000000000", BLUE],
+            },
+          ]
+        : [],
+    query: { enabled: Boolean(p.marketId && p.collateralAddress && address) },
+  });
+
+  const params = onChain?.[0]?.result as
+    | readonly [`0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`, bigint]
+    | undefined;
+  const walletBalance = (onChain?.[1]?.result as bigint | undefined) ?? 0n;
+  const allowance = (onChain?.[2]?.result as bigint | undefined) ?? 0n;
 
   const price = p.price ?? 0;
   const collateralValue = collateral;
@@ -30,8 +71,51 @@ export function PositionPanel(p: Props) {
   const borrowHf = healthFactor(collateralValue, debt, p.lltv);
   const borrowLiq =
     price === 0 || collateral === 0 ? null : liquidationPrice(collateral / price, debt, p.lltv, price);
-
   const plan = leveragePlan(collateralValue, leverage, p.lltv);
+
+  const collateralUnits = price === 0 ? 0n : BigInt(Math.round((collateral / price) * 10 ** p.collateralDecimals));
+  const debtUnits = BigInt(Math.round(debt * 10 ** p.loanDecimals));
+  const balanceHuman = Number(walletBalance) / 10 ** p.collateralDecimals;
+  const enoughCollateral = walletBalance >= collateralUnits;
+
+  async function openPosition() {
+    if (!params || !address || !p.collateralAddress) return;
+    const marketParams = {
+      loanToken: params[0],
+      collateralToken: params[1],
+      oracle: params[2],
+      irm: params[3],
+      lltv: params[4],
+    };
+
+    const calls = [];
+    // Approve only when the allowance is actually short: an extra signature for nothing is the
+    // fastest way to make someone distrust a flow.
+    if (allowance < collateralUnits) {
+      calls.push({
+        address: p.collateralAddress,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [BLUE, collateralUnits],
+      });
+    }
+    calls.push({
+      address: BLUE,
+      abi: morphoBlueAbi,
+      functionName: "supplyCollateral",
+      args: [marketParams, collateralUnits, address, "0x"],
+    });
+    if (debtUnits > 0n) {
+      calls.push({
+        address: BLUE,
+        abi: morphoBlueAbi,
+        functionName: "borrow",
+        args: [marketParams, debtUnits, 0n, address, address],
+      });
+    }
+
+    await run(`Borrow ${usd(debt)} against ${(collateral / (price || 1)).toFixed(4)} ${p.subject}`, calls as never);
+  }
 
   const disabled = p.status !== "listed";
 
@@ -55,9 +139,20 @@ export function PositionPanel(p: Props) {
 
         <div className="mt-6 flex flex-col gap-5">
           <label className="flex flex-col gap-2">
-            <span className="text-[11px] uppercase tracking-widest text-text-soft">
-              {p.side === "long" ? `${p.subject} collateral, in USD` : "USDG posted, in USD"}
-            </span>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] uppercase tracking-widest text-text-soft">
+                {p.side === "long" ? `${p.subject} collateral, in USD` : "USDG posted, in USD"}
+              </span>
+              {isConnected && (
+                <button
+                  type="button"
+                  onClick={() => setCollateral(Math.floor(balanceHuman * price * 100) / 100)}
+                  className="num text-[11px] text-brand hover:underline"
+                >
+                  wallet {balanceHuman.toFixed(4)} {p.subject}
+                </button>
+              )}
+            </div>
             <input
               type="number"
               min={0}
@@ -136,20 +231,36 @@ export function PositionPanel(p: Props) {
             )}
           </div>
 
-          <button
-            type="button"
-            disabled={disabled}
-            className={`w-full rounded-full px-6 py-3 text-sm font-medium ${
-              disabled
-                ? "cursor-not-allowed bg-bg-soft text-text-soft"
-                : "bg-brand-bright text-bg-deep hover:bg-brand hover:text-white"
-            }`}
-          >
-            {disabled ? "Market not created yet" : "Connect wallet"}
-          </button>
+          {disabled ? (
+            <button type="button" disabled className="w-full cursor-not-allowed rounded-full bg-bg-soft px-6 py-3 text-sm text-text-soft">
+              Market not created yet
+            </button>
+          ) : !isConnected ? (
+            <ConnectButton />
+          ) : tab === "Multiply" ? (
+            <button type="button" disabled className="w-full cursor-not-allowed rounded-full bg-bg-soft px-6 py-3 text-sm text-text-soft">
+              Multiply needs one Morpho authorisation — coming next
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={openPosition}
+              disabled={busy || !enoughCollateral || collateral === 0}
+              className="w-full rounded-full bg-brand-bright px-6 py-3 text-sm font-medium text-bg-deep hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-text-soft"
+            >
+              {busy
+                ? "Signing…"
+                : !enoughCollateral
+                  ? `Not enough ${p.subject} in the wallet`
+                  : debt > 0
+                    ? `Post collateral and borrow ${usd(debt)}`
+                    : "Post collateral"}
+            </button>
+          )}
+
           <p className="text-xs leading-relaxed text-text-soft">
-            Every action is simulated first: the health factor and liquidation price above are what you
-            sign against, not an estimate produced afterwards.
+            Every action is simulated before it reaches your wallet: the health factor and liquidation
+            price above are what you sign against, not an estimate produced afterwards.
           </p>
         </div>
       </div>

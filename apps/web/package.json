@@ -9,12 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@cluby/config": "workspace:*",
+    "@cluby/sdk": "workspace:*",
+    "@tanstack/react-query": "^5.102.8",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "viem": "^2.37.6",
-    "@cluby/config": "workspace:*",
-    "@cluby/sdk": "workspace:*"
+    "wagmi": "^3.7.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -1,6 +1,8 @@
 import { getVaults } from "@/lib/markets";
 import { pct, usd } from "@/lib/format";
 import { Badge, Card, SectionHeading } from "@/components/ui";
+import { VaultPanel } from "@/components/vault-panel";
+import { tokens } from "@cluby/config";
 
 export const revalidate = 30;
 export const metadata = { title: "Earn — Cluby" };
@@ -86,17 +88,22 @@ export default async function EarnPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                disabled={v.status !== "listed"}
-                className={`mt-8 w-full rounded-full px-6 py-3 text-sm lg:w-auto lg:px-10 ${
-                  v.status === "listed"
-                    ? "bg-brand-bright font-medium text-bg-deep hover:bg-brand hover:text-white"
-                    : "cursor-not-allowed bg-bg-soft text-text-soft"
-                }`}
-              >
-                {v.status === "listed" ? `Deposit ${v.asset}` : "Opens when the vault is deployed"}
-              </button>
+              {v.status === "listed" && v.address ? (
+                <VaultPanel
+                  vault={v.address}
+                  asset={v.asset}
+                  assetAddress={tokens[v.asset as keyof typeof tokens].address as `0x${string}`}
+                  assetDecimals={tokens[v.asset as keyof typeof tokens].decimals}
+                />
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-8 w-full cursor-not-allowed rounded-full bg-bg-soft px-6 py-3 text-sm text-text-soft lg:w-auto lg:px-10"
+                >
+                  Opens when the vault is deployed
+                </button>
+              )}
             </Card>
           ))}
 

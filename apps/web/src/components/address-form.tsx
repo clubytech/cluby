@@ -1,12 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
 
 export function AddressForm({ defaultValue }: { defaultValue: string }) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
+  const { address } = useAccount();
   const valid = /^0x[a-fA-F0-9]{40}$/.test(value);
+
+  // Connecting a wallet answers the question this form asks, so it fills itself in.
+  useEffect(() => {
+    if (address && !defaultValue) {
+      setValue(address);
+      router.replace(`/portfolio?address=${address}`);
+    }
+  }, [address, defaultValue, router]);
 
   return (
     <form
