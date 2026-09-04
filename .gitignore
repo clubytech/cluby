@@ -11,3 +11,4 @@ pages/
 deploy/
 *.tsbuildinfo
 .DS_Store
+.keeper-state.json

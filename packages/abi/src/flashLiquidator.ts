@@ -3,17 +3,17 @@ export const flashLiquidatorAbi = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "market_",
+        "name": "_morpho",
         "type": "address",
-        "internalType": "contract Market"
+        "internalType": "address"
       },
       {
-        "name": "swapRouter_",
+        "name": "_router",
         "type": "address",
-        "internalType": "contract ISwapRouter02"
+        "internalType": "address"
       },
       {
-        "name": "owner_",
+        "name": "_owner",
         "type": "address",
         "internalType": "address"
       }
@@ -29,62 +29,137 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "function",
-    "name": "liquidate",
+    "name": "keepers",
     "inputs": [
-      {
-        "name": "id",
-        "type": "bytes32",
-        "internalType": "Id"
-      },
-      {
-        "name": "borrower",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "repayShares",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "poolFee",
-        "type": "uint24",
-        "internalType": "uint24"
-      },
-      {
-        "name": "minProfit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "profit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "market",
-    "inputs": [],
-    "outputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract Market"
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "onMarketLiquidate",
+    "name": "liquidate",
     "inputs": [
       {
-        "name": "repaidAssets",
+        "name": "p",
+        "type": "tuple",
+        "internalType": "struct FlashLiquidator.LiquidateParams",
+        "components": [
+          {
+            "name": "marketParams",
+            "type": "tuple",
+            "internalType": "struct MarketParams",
+            "components": [
+              {
+                "name": "loanToken",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "collateralToken",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "oracle",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "irm",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "lltv",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "borrower",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "seizedAssets",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "repaidShares",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "swapFee",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "flashAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "minAmountOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "morpho",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IMorpho"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "onMorphoFlashLoan",
+    "inputs": [
+      {
+        "name": "assets",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "onMorphoLiquidate",
+    "inputs": [
+      {
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -95,7 +170,7 @@ export const flashLiquidatorAbi = [
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -132,7 +207,7 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "function",
-    "name": "swapRouter",
+    "name": "router",
     "inputs": [],
     "outputs": [
       {
@@ -145,15 +220,28 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "function",
-    "name": "sweep",
+    "name": "setKeeper",
     "inputs": [
       {
-        "name": "token",
+        "name": "keeper",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "to",
+        "name": "allowed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "sweep",
+    "inputs": [
+      {
+        "name": "token",
         "type": "address",
         "internalType": "address"
       }
@@ -176,14 +264,27 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "event",
-    "name": "Liquidated",
+    "name": "KeeperSet",
     "inputs": [
       {
-        "name": "id",
-        "type": "bytes32",
+        "name": "keeper",
+        "type": "address",
         "indexed": true,
-        "internalType": "Id"
+        "internalType": "address"
       },
+      {
+        "name": "allowed",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Liquidated",
+    "inputs": [
       {
         "name": "borrower",
         "type": "address",
@@ -191,13 +292,19 @@ export const flashLiquidatorAbi = [
         "internalType": "address"
       },
       {
-        "name": "repaid",
+        "name": "collateral",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "seizedAssets",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "seized",
+        "name": "repaidAssets",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -251,7 +358,28 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "error",
-    "name": "NotMarket",
+    "name": "NoProfit",
+    "inputs": [
+      {
+        "name": "received",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "owed",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotKeeper",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotMorpho",
     "inputs": []
   },
   {
@@ -273,22 +401,6 @@ export const flashLiquidatorAbi = [
         "name": "account",
         "type": "address",
         "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ProfitBelowMin",
-    "inputs": [
-      {
-        "name": "profit",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "minProfit",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ]
   },

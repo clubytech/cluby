@@ -68,6 +68,7 @@ contract FlashLiquidatorTest is Test {
                 seizedAssets: 10e18,
                 repaidShares: 0,
                 swapFee: 500,
+                flashAmount: 500e6,
                 minAmountOut: 500e6
             })
         );
@@ -93,6 +94,7 @@ contract FlashLiquidatorTest is Test {
                 seizedAssets: 10e18,
                 repaidShares: 0,
                 swapFee: 500,
+                flashAmount: 500e6,
                 minAmountOut: 500e6
             })
         );
@@ -107,6 +109,7 @@ contract FlashLiquidatorTest is Test {
                 seizedAssets: 10e18,
                 repaidShares: 0,
                 swapFee: 500,
+                flashAmount: 500e6,
                 minAmountOut: 500e6
             })
         );

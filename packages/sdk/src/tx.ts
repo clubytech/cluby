@@ -1,7 +1,7 @@
 import { encodeFunctionData, maxUint256, type Address } from "viem";
 import { morpho } from "@cluby/config";
-import { erc20Abi, morphoBlueAbi, uniswapV3PoolAbi, vaultAbi } from "./abi";
-import type { MarketParams } from "./market-id";
+import { erc20Abi, morphoBlueAbi, uniswapV3PoolAbi, vaultAbi } from "./abi.ts";
+import type { MarketParams } from "./market-id.ts";
 
 const BLUE = morpho.blue.address as Address;
 

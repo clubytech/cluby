@@ -44,6 +44,9 @@ importers:
       '@cluby/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@cluby/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       viem:
         specifier: 2.56.3
         version: 2.56.3(typescript@5.9.3)(zod@4.5.4)

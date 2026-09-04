@@ -3,22 +3,60 @@ export const lensAbi = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "market_",
+        "name": "_morpho",
         "type": "address",
-        "internalType": "contract Market"
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "market",
-    "inputs": [],
+    "name": "healthFactors",
+    "inputs": [
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct MarketParams",
+        "components": [
+          {
+            "name": "loanToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "collateralToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "oracle",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "irm",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "lltv",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "users",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
     "outputs": [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract Market"
+        "name": "hfs",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -28,9 +66,36 @@ export const lensAbi = [
     "name": "marketView",
     "inputs": [
       {
-        "name": "id",
-        "type": "bytes32",
-        "internalType": "Id"
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct MarketParams",
+        "components": [
+          {
+            "name": "loanToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "collateralToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "oracle",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "irm",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "lltv",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "outputs": [
@@ -40,17 +105,22 @@ export const lensAbi = [
         "internalType": "struct Lens.MarketView",
         "components": [
           {
+            "name": "id",
+            "type": "bytes32",
+            "internalType": "Id"
+          },
+          {
             "name": "params",
             "type": "tuple",
             "internalType": "struct MarketParams",
             "components": [
               {
-                "name": "stock",
+                "name": "loanToken",
                 "type": "address",
                 "internalType": "address"
               },
               {
-                "name": "collateral",
+                "name": "collateralToken",
                 "type": "address",
                 "internalType": "address"
               },
@@ -63,13 +133,18 @@ export const lensAbi = [
                 "name": "irm",
                 "type": "address",
                 "internalType": "address"
+              },
+              {
+                "name": "lltv",
+                "type": "uint256",
+                "internalType": "uint256"
               }
             ]
           },
           {
             "name": "state",
             "type": "tuple",
-            "internalType": "struct MarketState",
+            "internalType": "struct Market",
             "components": [
               {
                 "name": "totalSupplyAssets",
@@ -93,45 +168,13 @@ export const lensAbi = [
               },
               {
                 "name": "lastUpdate",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "feeBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              }
-            ]
-          },
-          {
-            "name": "risk",
-            "type": "tuple",
-            "internalType": "struct RiskParams",
-            "components": [
-              {
-                "name": "initialMarginBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "liqThresholdBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "liqBonusBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "borrowCap",
                 "type": "uint128",
                 "internalType": "uint128"
               },
               {
-                "name": "flags",
-                "type": "uint8",
-                "internalType": "uint8"
+                "name": "fee",
+                "type": "uint128",
+                "internalType": "uint128"
               }
             ]
           },
@@ -141,69 +184,27 @@ export const lensAbi = [
             "internalType": "uint256"
           },
           {
-            "name": "borrowAprWad",
+            "name": "borrowRatePerSecond",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "supplyAprWad",
+            "name": "borrowApyWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "supplyApyWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "liquidityAssets",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
             "name": "price",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "priceOk",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "quote",
-            "type": "tuple",
-            "internalType": "struct StockOracle.Quote",
-            "components": [
-              {
-                "name": "feedPrice",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "twapPrice",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "feedUpdatedAt",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "feedFresh",
-                "type": "bool",
-                "internalType": "bool"
-              },
-              {
-                "name": "feedValid",
-                "type": "bool",
-                "internalType": "bool"
-              },
-              {
-                "name": "twapValid",
-                "type": "bool",
-                "internalType": "bool"
-              }
-            ]
-          },
-          {
-            "name": "weekendMode",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "availableToBorrow",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -214,17 +215,219 @@ export const lensAbi = [
   },
   {
     "type": "function",
-    "name": "userView",
+    "name": "marketViews",
     "inputs": [
       {
-        "name": "id",
-        "type": "bytes32",
-        "internalType": "Id"
+        "name": "paramsList",
+        "type": "tuple[]",
+        "internalType": "struct MarketParams[]",
+        "components": [
+          {
+            "name": "loanToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "collateralToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "oracle",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "irm",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "lltv",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "out",
+        "type": "tuple[]",
+        "internalType": "struct Lens.MarketView[]",
+        "components": [
+          {
+            "name": "id",
+            "type": "bytes32",
+            "internalType": "Id"
+          },
+          {
+            "name": "params",
+            "type": "tuple",
+            "internalType": "struct MarketParams",
+            "components": [
+              {
+                "name": "loanToken",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "collateralToken",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "oracle",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "irm",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "lltv",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "state",
+            "type": "tuple",
+            "internalType": "struct Market",
+            "components": [
+              {
+                "name": "totalSupplyAssets",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "totalSupplyShares",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "totalBorrowAssets",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "totalBorrowShares",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "fee",
+                "type": "uint128",
+                "internalType": "uint128"
+              }
+            ]
+          },
+          {
+            "name": "utilizationWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "borrowRatePerSecond",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "borrowApyWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "supplyApyWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "liquidityAssets",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "price",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "morpho",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IMorpho"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "previewBorrow",
+    "inputs": [
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct MarketParams",
+        "components": [
+          {
+            "name": "loanToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "collateralToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "oracle",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "irm",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "lltv",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       },
       {
         "name": "user",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "addCollateral",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "addBorrow",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [
@@ -234,26 +437,14 @@ export const lensAbi = [
         "internalType": "struct Lens.UserView",
         "components": [
           {
-            "name": "pos",
-            "type": "tuple",
-            "internalType": "struct Position",
-            "components": [
-              {
-                "name": "supplyShares",
-                "type": "uint128",
-                "internalType": "uint128"
-              },
-              {
-                "name": "borrowShares",
-                "type": "uint128",
-                "internalType": "uint128"
-              },
-              {
-                "name": "collateral",
-                "type": "uint128",
-                "internalType": "uint128"
-              }
-            ]
+            "name": "collateral",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "collateralValue",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "supplyAssets",
@@ -266,7 +457,12 @@ export const lensAbi = [
             "internalType": "uint256"
           },
           {
-            "name": "debtValue",
+            "name": "maxBorrowAssets",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "safeBorrowAssets",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -281,14 +477,112 @@ export const lensAbi = [
             "internalType": "uint256"
           },
           {
+            "name": "liquidatable",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "userView",
+    "inputs": [
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct MarketParams",
+        "components": [
+          {
+            "name": "loanToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "collateralToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "oracle",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "irm",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "lltv",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "safeMarginWad",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "u",
+        "type": "tuple",
+        "internalType": "struct Lens.UserView",
+        "components": [
+          {
+            "name": "collateral",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "collateralValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "supplyAssets",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "borrowAssets",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "maxBorrowAssets",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "withdrawableCollateral",
+            "name": "safeBorrowAssets",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "healthFactorWad",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "liquidationPrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "liquidatable",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }

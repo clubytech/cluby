@@ -419,7 +419,12 @@ export const deployments: {
   markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
   lens: "0x5fC2Cd44d8caA4b3A6e330849bEbc3cA323c625b",
-  flashLiquidator: "0xDCc269c0D8e86229f32Aadf4B7937899799337b3",
+  /**
+   * Second deploy: the first (0xDCc269c0…) collapsed the flash-loan size and the swap floor into
+   * one number, which holds only while the debt stays under the floor. Abandoned, not upgraded —
+   * it holds nothing, so replacing it costs a deploy and nothing else.
+   */
+  flashLiquidator: "0x91B3c5b8C76386A8293B1CE97fE8dceB10733F5B",
   owner: "0x9C5C4b4A985b0A60a1067a0d82020774661d074A",
   /** Block of the first Cluby deploy — where the indexer starts. */
   startBlock: 54451901,

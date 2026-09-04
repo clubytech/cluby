@@ -6,6 +6,9 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // @cluby/sdk is consumed as source by both Next (bundler resolution) and Node
+    // (nodenext, which demands explicit extensions). Allowing them here satisfies both.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

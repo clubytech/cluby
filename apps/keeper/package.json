@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "watch-only": "node --experimental-strip-types src/index.ts"
   },
   "dependencies": {
     "@cluby/abi": "workspace:*",
     "@cluby/config": "workspace:*",
-    "viem": "2.56.3"
+    "viem": "2.56.3",
+    "@cluby/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -43,8 +43,16 @@ contract FlashLiquidator is IMorphoFlashLoanCallback, IMorphoLiquidateCallback, 
         uint256 repaidShares;
         /// @dev Pool fee tier for the collateral → loan-token swap.
         uint24 swapFee;
+        /// @dev How much of the loan token to flash-borrow. It must cover what Morpho will pull to
+        /// repay the borrower's debt, so the keeper sizes it from the debt plus a margin.
+        uint256 flashAmount;
         /// @dev Floor on the swap output. Derived from the oracle price by the caller, so a pool
         /// that has been pushed away from the market makes this revert instead of selling into it.
+        ///
+        /// Kept separate from `flashAmount` deliberately: one is what we must repay, the other is
+        /// what the collateral must fetch. Collapsing them into a single number works right up
+        /// until the debt exceeds the floor, and then the liquidation reverts for want of balance
+        /// with nothing in the revert to say why.
         uint256 minAmountOut;
     }
 
@@ -72,16 +80,15 @@ contract FlashLiquidator is IMorphoFlashLoanCallback, IMorphoLiquidateCallback, 
     function liquidate(LiquidateParams calldata p) external {
         if (!keepers[msg.sender] && msg.sender != owner()) revert NotKeeper();
 
-        // The flash loan has to cover the repayment. Seizing by collateral amount means the debt
-        // repaid is only known inside the callback, so borrow against the seized value at the
-        // oracle price and return whatever is left in the same transaction.
-        uint256 loanAmount = p.minAmountOut;
-        morpho.flashLoan(p.marketParams.loanToken, loanAmount, abi.encode(p, loanAmount));
+        // Seizing by collateral amount means the exact repayment is only known inside the
+        // callback, so the keeper borrows enough to cover it and the surplus goes back in the same
+        // transaction.
+        morpho.flashLoan(p.marketParams.loanToken, p.flashAmount, abi.encode(p));
     }
 
     function onMorphoFlashLoan(uint256 assets, bytes calldata data) external {
         if (msg.sender != address(morpho)) revert NotMorpho();
-        (LiquidateParams memory p,) = abi.decode(data, (LiquidateParams, uint256));
+        LiquidateParams memory p = abi.decode(data, (LiquidateParams));
 
         IERC20 loanToken = IERC20(p.marketParams.loanToken);
         IERC20 collateral = IERC20(p.marketParams.collateralToken);

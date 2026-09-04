@@ -73,6 +73,13 @@ contract MorphoStackForkTest is Test {
 
     /// The oracle Morpho's factory builds must agree with the feed it reads, or every number after
     /// this point is wrong in a way no later test would catch.
+    /// Morpho's own formula, mirrored here because the keeper has to size the flash loan with it.
+    function _liquidationIncentiveFactor(uint256 lltv) internal pure returns (uint256) {
+        uint256 cursor = 0.3e18;
+        uint256 factor = (1e18 * 1e18) / (1e18 - (cursor * (1e18 - lltv)) / 1e18);
+        return factor < 1.15e18 ? factor : 1.15e18;
+    }
+
     function test_oracleMatchesTheFeed() public view {
         (, int256 answer,,,) = IAggregatorV3(FEED_NVDA).latestRoundData();
         uint256 feedPrice = uint256(answer); // 8 decimals
@@ -198,6 +205,13 @@ contract MorphoStackForkTest is Test {
         // Floor the swap at 92% of oracle value: enough room for pool fees, tight enough that a
         // pool pushed away from the market reverts instead of selling into it.
         uint256 minOut = (seize * price * 92) / (1e36 * 100);
+        // What Morpho will actually pull for that much collateral. Seizing by amount means the
+        // repayment is the seized value discounted by the liquidation incentive, NOT the whole
+        // debt — flash-borrowing the debt instead leaves the swap unable to cover the loan.
+        //   LIF = min(1.15, 1 / (1 − 0.3·(1 − LLTV)))
+        uint256 lif = _liquidationIncentiveFactor(LLTV);
+        uint256 repaid = ((seize * price) / 1e36) * 1e18 / lif;
+        uint256 flashAmount = (repaid * 101) / 100; // a point of margin for rounding
 
         uint256 ownerBefore = IERC20(USDG).balanceOf(owner);
         vm.prank(keeper);
@@ -208,6 +222,7 @@ contract MorphoStackForkTest is Test {
                 seizedAssets: seize,
                 repaidShares: 0,
                 swapFee: 500,
+                flashAmount: flashAmount,
                 minAmountOut: minOut
             })
         );

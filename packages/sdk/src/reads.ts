@@ -9,9 +9,9 @@ import {
   stockTokenAbi,
   uniswapV3PoolAbi,
   vaultAbi,
-} from "./abi";
-import { rateToApy, toAssetsDown } from "./math";
-import type { MarketParams } from "./market-id";
+} from "./abi.ts";
+import { rateToApy, toAssetsDown } from "./math.ts";
+import type { MarketParams } from "./market-id.ts";
 
 const BLUE = morpho.blue.address as Address;
 const IRM = morpho.adaptiveCurveIrm.address as Address;
