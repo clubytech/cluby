@@ -1,0 +1,23 @@
+{
+  "name": "@cluby/indexer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "ponder dev",
+    "start": "ponder start",
+    "codegen": "ponder codegen",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cluby/abi": "workspace:*",
+    "@cluby/config": "workspace:*",
+    "hono": "^4",
+    "ponder": "0.17.8",
+    "viem": "2.56.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.7"
+  }
+}

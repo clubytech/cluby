@@ -1,0 +1,12 @@
+{
+  "name": "cluby",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm --filter @cluby/web dev",
+    "build": "pnpm --filter @cluby/web build",
+    "build:contracts": "cd contracts && forge build",
+    "test:contracts": "cd contracts && forge test --no-match-path 'test/fork/*'",
+    "test:fork": "cd contracts && forge test --match-path 'test/fork/*' --fork-url robinhood -vv"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+contracts/out/
+contracts/cache/
+apps/indexer/.ponder/
+apps/*/dist/
+pages/
+deploy/
+*.tsbuildinfo
+.DS_Store

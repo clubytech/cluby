@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+ * Cluby design tokens.
+ * Structure and scale are lifted from the reference capture (pill header, serif display,
+ * 28px cards, light/dark band rhythm); the palette is ours, measured from assets/:
+ * #002B38 deep ground, #003F4F mid, #00788C brand teal, #40B0C0 bright cyan, #F0F0F0 silver.
+ */
+@theme {
+  --color-bg-deep: #001b24;
+  --color-bg-strong: #002b38;
+  --color-bg-mid: #003f4f;
+  --color-bg-weak: #f1f4f5;
+  --color-bg-soft: #e3eaec;
+  --color-bg-white: #ffffff;
+
+  --color-brand: #00788c;
+  --color-brand-bright: #40b0c0;
+  --color-brand-dim: #0a5c6c;
+
+  --color-text-strong: #06222b;
+  --color-text-sub: #204450;
+  --color-text-soft: #5f7c85;
+  --color-text-white: #f0f0f0;
+  --color-text-faint: #9fb3b9;
+
+  --color-line: #d7e1e4;
+  --color-line-dark: rgba(240, 240, 240, 0.12);
+
+  --color-up: #17a37b;
+  --color-down: #e5484d;
+  --color-warn: #f5a524;
+
+  --radius-card: 28px;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--color-bg-white);
+    color: var(--color-text-strong);
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@utility container-padding {
+  max-width: 77.5rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+}
+
+@utility section-y {
+  padding-block: 3rem;
+  @media (width >= 48rem) {
+    padding-block: 4rem;
+  }
+  @media (width >= 64rem) {
+    padding-block: 6.25rem;
+  }
+}
+
+/* Numbers are tabular everywhere: a rate column that jitters on refresh reads as broken. */
+@utility num {
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
