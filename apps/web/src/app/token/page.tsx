@@ -1,9 +1,19 @@
 import Link from "next/link";
 import { Badge, Card, SectionHeading } from "@/components/ui";
+import { deployments } from "@cluby/config";
 import { getProtocolStats } from "@/lib/markets";
+import { getTokenListing } from "@/lib/token-listing";
 import { pct, usd } from "@/lib/format";
 
-export const revalidate = 300;
+/**
+ * Thirty seconds, not five minutes.
+ *
+ * This page is one transaction away from being a different page: the minute the token registry has
+ * an address in it, the ticker and the contract belong at the top of this page rather than a line
+ * saying there is no token. `revalidate` is the whole delay between the owner signing and a reader
+ * seeing it, so it is set to what a launch can tolerate rather than to what a static page prefers.
+ */
+export const revalidate = 30;
 export const metadata = {
   title: "Token — Cluby",
   description:
@@ -22,25 +32,75 @@ function Row({ k, v, note }: { k: string; v: string; note: string }) {
 }
 
 export default async function TokenPage() {
-  const stats = await getProtocolStats();
+  const [stats, listing] = await Promise.all([getProtocolStats(), getTokenListing()]);
   const e = stats.economics;
 
   const stakerShare = e.feeSplit.stakers;
   const treasuryShare = e.feeSplit.treasury;
+
+  // The ticker is whatever the published contract calls itself, never a string kept here. A page
+  // that hard-codes "$CLUBY" next to an address is a page that can be made to lie by one bad paste.
+  const live = listing.token !== null;
+  const symbol = listing.symbol ? `$${listing.symbol}` : "the token";
 
   return (
     <>
       <section className="bg-bg-strong text-white">
         <div className="container-padding pb-16 pt-10">
           <div className="flex flex-wrap items-center gap-4">
-            <SectionHeading align="left" title="The token is a claim on fees that already exist." />
-            <Badge tone="pending">Soon</Badge>
+            <SectionHeading
+              align="left"
+              title={
+                live
+                  ? `${symbol} is a claim on fees that already exist.`
+                  : "The token is a claim on fees that already exist."
+              }
+            />
+            <Badge tone={live ? "live" : "pending"}>{live ? "Live" : "Soon"}</Badge>
           </div>
-          <p className="mt-4 max-w-2xl text-white/70">
-            There is no token yet. When there is one, it will not be paid for by inflation — every
-            mechanism below is running on this chain today, taking a real fee out of real interest.
-            What is undecided is said so, plainly, further down.
-          </p>
+          {live ? (
+            <>
+              <p className="mt-4 max-w-2xl text-white/70">
+                It is not paid for by inflation — every mechanism below is running on this chain
+                today, taking a real fee out of real interest. What is undecided is still said so,
+                plainly, further down.
+              </p>
+              <div className="mt-8 rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                  Contract address
+                </p>
+                <p className="num mt-2 break-all text-lg font-bold tracking-tight text-white">
+                  {listing.token}
+                </p>
+                <p className="mt-3 text-sm text-white/60">
+                  {listing.decimals} decimals
+                  {listing.totalSupply > 0n && (
+                    <>
+                      {" · "}
+                      {Number(
+                        listing.totalSupply / 10n ** BigInt(listing.decimals || 18),
+                      ).toLocaleString("en-US")}{" "}
+                      total supply
+                    </>
+                  )}
+                  {" · published on chain "}
+                  {new Date(listing.listedAt * 1000).toISOString().slice(0, 10)}
+                </p>
+                <p className="mt-4 text-sm text-white/60">
+                  Read from{" "}
+                  <span className="num break-all">{deployments.tokenRegistry}</span>, which only the
+                  protocol&apos;s owner can write. Check it against the chain before you send
+                  anything anywhere — including against this page.
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="mt-4 max-w-2xl text-white/70">
+              There is no token yet. When there is one, it will not be paid for by inflation — every
+              mechanism below is running on this chain today, taking a real fee out of real interest.
+              What is undecided is said so, plainly, further down.
+            </p>
+          )}
         </div>
       </section>
 

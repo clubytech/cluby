@@ -17,12 +17,20 @@ type Item = { href: string; label: string; soon?: boolean };
  * (portfolio), and the two things they are here to read about (token, docs). Everything else is
  * something you go looking for rather than something you land on.
  */
+/**
+ * `soon` on Token is not a constant: the token registry decides it.
+ *
+ * A nav that still says "soon" next to a page announcing a live contract address is the kind of
+ * disagreement that makes a reader wonder which half of the site to believe — and on a page whose
+ * subject is an address people send money to, that doubt is expensive. So the flag comes from the
+ * same read the page uses.
+ */
 const primary: Item[] = [
   { href: "/earn", label: "Earn" },
   { href: "/borrow", label: "Borrow" },
   { href: "/stake", label: "Stake" },
   { href: "/portfolio", label: "Portfolio" },
-  { href: "/token", label: "Token", soon: true },
+  { href: "/token", label: "Token" },
   { href: "/docs", label: "Docs" },
 ];
 
@@ -33,6 +41,11 @@ const more: Item[] = [
   { href: "/launchpad", label: "Launchpad", soon: true },
 ];
 
+/** The nav items as rendered, with Token's badge resolved against the chain. */
+function withTokenState(items: Item[], tokenLive: boolean): Item[] {
+  return items.map((i) => (i.href === "/token" ? { ...i, soon: !tokenLive } : i));
+}
+
 function Soon() {
   return (
     <span className="ml-1.5 rounded-full bg-brand-bright/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-brand-bright">
@@ -41,7 +54,11 @@ function Soon() {
   );
 }
 
-export function SiteHeader() {
+export function SiteHeader({ tokenLive = false }: { tokenLive?: boolean }) {
+  // Resolved once: three render sites use these lists and all three must agree.
+  const barItems = withTokenState(primary, tokenLive);
+  const moreItems = withTokenState(more, tokenLive);
+
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -128,7 +145,7 @@ export function SiteHeader() {
             >
               <Pill pill={nav.pill} className="-z-10 bg-white/10" />
 
-              {primary.map((item) => (
+              {barItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -181,7 +198,7 @@ export function SiteHeader() {
                       : "pointer-events-none scale-95 opacity-0"
                   }`}
                 >
-                  {more.map((item) => (
+                  {moreItems.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
@@ -227,7 +244,7 @@ export function SiteHeader() {
             }`}
           >
             <nav className="flex min-h-0 flex-col gap-1 px-2 pt-4">
-              {[...primary, ...more].map((item) => (
+              {[...barItems, ...moreItems].map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

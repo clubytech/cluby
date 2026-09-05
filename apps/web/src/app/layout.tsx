@@ -3,6 +3,7 @@ import { Inter, IBM_Plex_Serif, IBM_Plex_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { getTokenListing } from "@/lib/token-listing";
 import "./globals.css";
 
 // Inter is variable, so every weight between 100 and 900 is already in the one file: asking for
@@ -46,7 +47,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const listing = await getTokenListing();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -54,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ background: "#ffffff" }}
       >
         <Providers>
-          <SiteHeader />
+          <SiteHeader tokenLive={listing.token !== null} />
           <main>{children}</main>
           <SiteFooter />
         </Providers>
