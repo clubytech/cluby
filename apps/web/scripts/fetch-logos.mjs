@@ -22,8 +22,32 @@ const { marketCatalog } = await import("@cluby/config");
 
 // The tickers we need art for: whatever the market is about, which is the collateral on a long
 // market and the borrowed asset on a short one.
+/**
+ * The source is a US-EQUITY logo API, so it must only be asked about equities. Given a ticker it
+ * does not list, it does not 404 — it returns whatever company its search matched, and "WETH" came
+ * back as the logo of a company called Wetouch. A wrong logo is worse than a missing one: the
+ * monogram fallback is honest, and a confidently wrong mark is not.
+ *
+ * So anything that is not a listed equity or ETF is excluded by name. Ether gets its own mark drawn
+ * in `draw-crypto-logos.mjs`; the chain-native tokens have no company and use the monogram.
+ */
+const NOT_EQUITIES = new Set(["WETH", "PONS", "CASHCAT", "INDEX", "USDG"]);
+
+/**
+ * Equities whose logo is a multi-line text card rather than a mark. Both of these are CORRECT — GLD
+ * really does ship "SPDR Gold Shares / Exchange Traded Gold Security" set in three lines, and DJT
+ * carries its predecessor's Digital World Acquisition Corp block — and both are an unreadable smear
+ * at the 36px the table renders them at. The monogram is the better answer: it is legible, it is
+ * deliberate, and it does not pretend to information it cannot convey at that size.
+ *
+ * This is a judgement made by looking at all 38 rendered small, not by a metric. Detail density
+ * flags TSM and Invesco, which read fine; there is no measurement that separates "busy" from
+ * "illegible" as well as looking does.
+ */
+const TEXT_CARD_NOT_A_MARK = new Set(["GLD", "DJT"]);
+
 const subjects = [...new Set(marketCatalog.map((m) => (m.side === "long" ? m.collateral : m.loan)))]
-  .filter((s) => s !== "USDG")
+  .filter((s) => !NOT_EQUITIES.has(s) && !TEXT_CARD_NOT_A_MARK.has(s))
   .sort();
 
 mkdirSync(OUT, { recursive: true });
