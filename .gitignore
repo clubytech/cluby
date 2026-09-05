@@ -13,3 +13,4 @@ deploy/
 .DS_Store
 .keeper-state.json
 .vercel
+.claude/settings.local.json
