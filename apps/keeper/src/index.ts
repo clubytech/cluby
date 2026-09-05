@@ -3,13 +3,14 @@
  *
  * Env: RPC_URL (required), KEEPER_PK (optional — without it the keeper watches and alerts but never
  * signs), LENS_ADDR, FLASH_LIQ_ADDR, PONDER_URL, TELEGRAM_TOKEN, TELEGRAM_CHAT, POLL_MS,
- * WATCHDOG_MS, DIVERGENCE_BPS, MIN_PROFIT.
+ * WATCHDOG_MS, DIVERGENCE_BPS, MIN_PROFIT_USD, PROFIT_MARGIN_BPS, GAS_FLOOR.
  */
 import { alert } from "./alerts.ts";
 import { refreshBorrowers } from "./borrowers.ts";
 import { scanHealth, tryLiquidate, warnIfClose } from "./liquidate.ts";
 import { watchdogPass } from "./watchdog.ts";
 import { scorePass } from "./scores.ts";
+import { revertReason } from "./revert.ts";
 import { LENS, LIQUIDATOR, POLL_MS, WATCHDOG_MS, account, log } from "./env.ts";
 
 const WAD = 10n ** 18n;
@@ -31,13 +32,20 @@ async function liquidationPass() {
   }
 }
 
-/** A pass that throws must not take the loop down with it — the next tick is two seconds away. */
+/**
+ * A pass that throws must not take the loop down with it — the next tick is two seconds away.
+ *
+ * But it must not disappear either. A liquidation pass that throws every time looks, in the log,
+ * exactly like one that found nothing, and the whole point of this keeper is that somebody hears
+ * about it. The alert is deduplicated per pass name, so a persistent failure is one message an
+ * hour rather than eighteen hundred.
+ */
 async function safely(name: string, fn: () => Promise<void>) {
   try {
     await fn();
   } catch (e) {
-    // The message can carry the RPC URL, and the RPC URL carries the key; log() redacts it.
-    log(`${name} failed:`, (e as Error).message);
+    // The message can carry the RPC URL, and the RPC URL carries the key; alert() redacts it.
+    await alert(`pass-failed:${name}`, `The ${name} pass is failing: ${revertReason(e)}`);
   }
 }
 

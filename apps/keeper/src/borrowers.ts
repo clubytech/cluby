@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Hex } from "viem";
-import { parseAbiItem } from "viem";
+import { isAddress, parseAbiItem } from "viem";
 import { CATCHUP_MS, LOG_CHUNK, MARKETS, MORPHO_BLUE, PONDER_URL, START_BLOCK, log, pub } from "./env.ts";
 
 const borrowEvent = parseAbiItem(
@@ -9,6 +9,7 @@ const borrowEvent = parseAbiItem(
 
 const marketIds = Object.entries(MARKETS).map(([key, m]) => ({ key, id: m.id as Hex }));
 const allIds = marketIds.map((m) => m.id);
+const knownMarketIds = new Set(allIds.map((id) => id.toLowerCase()));
 
 /**
  * marketId → everyone who has ever borrowed there. Nobody is removed: debt only leaves by repayment
@@ -52,7 +53,14 @@ let loaded = false;
 
 /**
  * Who to watch. The indexer knows, but the keeper must not depend on it — liquidation is the one
- * job that cannot wait for a service to come back — so it falls back to reading Morpho's own logs.
+ * job that cannot wait for a service to come back — so it reads Morpho's own logs every pass and
+ * treats the indexer as an extra source to union in, never as the answer.
+ *
+ * The distinction is the whole point. An indexer that is behind, mid-reindex, or freshly reorged
+ * answers 200 with a short list or an empty one, and a keeper that returns early on a 200 then
+ * reports "0 open positions" and raises nothing. That is not a failure anyone gets paged for; it
+ * is a Tuesday. Only `!r.ok` and thrown errors used to fall through to the chain, which are the
+ * two cases that were never the likely ones.
  *
  * The chunk size is small on purpose. Alchemy's free tier caps `eth_getLogs` at a TEN block range,
  * and with ~214 ms blocks that is two seconds of history per request: a naive scan from the deploy
@@ -64,7 +72,8 @@ export async function refreshBorrowers(): Promise<Map<string, Set<string>>> {
     loadState();
     loaded = true;
   }
-  if (PONDER_URL && (await fromIndexer())) return known;
+  // A hint, and only a hint: whatever it returns is added to what the chain says, not instead of it.
+  if (PONDER_URL) await fromIndexer();
 
   const head = await pub.getBlockNumber();
   if (scannedTo === 0n) scannedTo = START_BLOCK > 0n ? START_BLOCK - 1n : head - LOG_CHUNK;
@@ -114,19 +123,48 @@ async function scanRange(from: bigint, to: bigint) {
   }
 }
 
-async function fromIndexer(): Promise<boolean> {
+/**
+ * Every row here came off an unauthenticated HTTP response, and creating a Morpho market is
+ * permissionless — so an attacker who can answer as the indexer could otherwise name a market whose
+ * oracle and loan token they wrote themselves, and the keeper would carry it into
+ * `idToMarketParams` and sort a fabricated health factor ahead of a real debtor. Rows that are not
+ * a market we deployed, addressed to something that is not an address, are dropped before they can
+ * reach the watch set — which is now persisted, so a bad row would otherwise outlive the restart.
+ */
+async function fromIndexer(): Promise<void> {
+  let dropped = 0;
   try {
     const r = await fetch(`${PONDER_URL}/positions/open`);
-    if (!r.ok) return false;
-    const rows = (await r.json()) as { marketId: string; user: string; borrowShares: string }[];
-    for (const row of rows) {
-      if (BigInt(row.borrowShares) === 0n) continue;
-      add(row.marketId.toLowerCase(), row.user);
+    if (!r.ok) {
+      log(`indexer answered ${r.status}; chain scan continues`);
+      return;
     }
-    return true;
-  } catch {
-    return false;
+    const body = await r.json();
+    if (!Array.isArray(body)) {
+      log("indexer returned a non-array; ignoring it");
+      return;
+    }
+    for (const row of body as { marketId?: unknown; user?: unknown; borrowShares?: unknown }[]) {
+      const marketId = typeof row?.marketId === "string" ? row.marketId.toLowerCase() : "";
+      const user = typeof row?.user === "string" ? row.user : "";
+      if (!knownMarketIds.has(marketId) || !isAddress(user)) {
+        dropped++;
+        continue;
+      }
+      let shares: bigint;
+      try {
+        shares = BigInt(row.borrowShares as string);
+      } catch {
+        dropped++;
+        continue;
+      }
+      if (shares === 0n) continue;
+      add(marketId, user);
+    }
+  } catch (e) {
+    log(`indexer unreachable (${(e as Error).message}); chain scan continues`);
   }
+  if (dropped > 0) log(`dropped ${dropped} indexer row(s) that named no market of ours`);
 }
 
 function add(marketId: string, user: string) {

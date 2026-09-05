@@ -428,6 +428,11 @@ export const lensAbi = [
         "name": "addBorrow",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "safeMarginWad",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [

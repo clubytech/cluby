@@ -29,8 +29,21 @@ export const POLL_MS = Number(process.env.POLL_MS ?? 2000);
 export const WATCHDOG_MS = Number(process.env.WATCHDOG_MS ?? 15 * 60 * 1000);
 /** Alert when the feed and the pool disagree by more than this. */
 export const DIVERGENCE_BPS = Number(process.env.DIVERGENCE_BPS ?? 500);
-/** Below this the liquidation is not worth the gas; in loan-token units. */
-export const MIN_PROFIT = BigInt(process.env.MIN_PROFIT ?? 1_000_000); // $1
+/**
+ * Below this a liquidation is not worth the gas, in WHOLE loan-token units — dollars for a USDG
+ * market, shares for a short one. It used to be a raw amount, 1_000_000, which reads as $1 against
+ * six-decimal USDG and as 1e-12 of a share against an eighteen-decimal short market: a floor set a
+ * trillion times too low on exactly the markets where the gas is least likely to be covered.
+ * Scaling by the market's own decimals at the point of use is the only way one constant can mean
+ * the same thing on both sides.
+ */
+export const MIN_PROFIT_USD = BigInt(process.env.MIN_PROFIT_USD ?? 1);
+
+/** How far above the repayment the sale must land before a liquidation is worth sending, in bps. */
+export const PROFIT_MARGIN_BPS = Number(process.env.PROFIT_MARGIN_BPS ?? 50);
+
+/** Alert when a signing key falls below this many wei of gas. Default 0.005 ETH. */
+export const GAS_FLOOR = BigInt(process.env.GAS_FLOOR ?? 5_000_000_000_000_000n);
 /** Warn when a position gets close, so a human sees it coming rather than reading about it after. */
 export const WARN_HF = BigInt(process.env.WARN_HF ?? 1_050_000_000_000_000_000n);
 
@@ -69,11 +82,18 @@ export const wallet = account ? createWalletClient({ chain, transport, account }
 /**
  * RPC errors quote the request URL in full, and the URL carries the API key. Anything printed —
  * or forwarded to Telegram — goes through here first.
+ *
+ * Only the URL is scrubbed, and deliberately only the URL. A pass over 64-hex strings was proposed
+ * and is refused: every such string the keeper prints is a transaction hash or a market id, and
+ * blanking those would cut the hash out of the one alert an operator actually needs to follow. The
+ * keeper's own key never reaches a string — it is consumed by `privateKeyToAccount` above and
+ * never interpolated into anything.
  */
 export function redact(text: string): string {
-  return text
-    .replace(/https:\/\/[^\s"']*\/v2\/[A-Za-z0-9_-]+/g, "https://<rpc>/v2/<redacted>")
-    .replace(/0x[a-fA-F0-9]{64}/g, (m) => (m === m.toLowerCase() ? m : m));
+  return text.replace(
+    /https:\/\/[^\s"']*(?:\/v[23]\/[A-Za-z0-9_-]{16,}|[?&](?:api[-_]?key|apikey|token)=[A-Za-z0-9_-]+)/gi,
+    "https://<rpc>/<redacted>",
+  );
 }
 
 export const log = (...a: unknown[]) =>

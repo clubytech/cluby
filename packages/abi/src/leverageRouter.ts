@@ -62,6 +62,11 @@ export const leverageRouterAbi = [
             "internalType": "uint256"
           },
           {
+            "name": "repayShares",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "collateralToSell",
             "type": "uint256",
             "internalType": "uint256"
@@ -80,6 +85,11 @@ export const leverageRouterAbi = [
             "name": "onBehalf",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "flashAmount",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -264,6 +274,11 @@ export const leverageRouterAbi = [
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "InconsistentInput",
+    "inputs": []
   },
   {
     "type": "error",

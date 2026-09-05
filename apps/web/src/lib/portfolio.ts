@@ -1,5 +1,6 @@
 import { deployments, marketCatalog, vaultCatalog } from "@cluby/config";
 import {
+  accrued,
   debtOf,
   getMarketParams,
   getMarketState,
@@ -51,7 +52,7 @@ export async function getPortfolio(address: `0x${string}`) {
     const deployed = deployments.markets[def.key];
     if (!deployed) continue;
 
-    const [params, state, position] = await Promise.all([
+    const [params, raw, position] = await Promise.all([
       getMarketParams(publicClient, deployed.id),
       getMarketState(publicClient, deployed.id),
       getPosition(publicClient, deployed.id, address),
@@ -59,6 +60,11 @@ export async function getPortfolio(address: `0x${string}`) {
 
     if (position.collateral === 0n && position.borrowShares === 0n && position.supplyShares === 0n) continue;
 
+    // Morpho only writes interest down when someone touches the market. Reading a debt off the raw
+    // state shows what was owed at the last interaction, which on a quiet market is hours ago — and
+    // the error is always in the flattering direction: less debt, a higher health factor, a
+    // liquidation price further away than the real one.
+    const state = await accrued(publicClient, params, raw);
     const price = await getOraclePrice(publicClient, params.oracle);
     const debt = debtOf(position, state);
     const hf = healthFactorWad(position.collateral, debt, price, params.lltv);

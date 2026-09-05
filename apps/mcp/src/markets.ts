@@ -25,6 +25,7 @@ import {
   safeLtvOf,
   subjectOf,
   tokenAddressOf,
+  accrued,
   debtOf,
 } from "@cluby/sdk";
 import { publicClient } from "./chain.ts";
@@ -84,10 +85,13 @@ export async function describeMarket(def: MarketDef) {
 
   if (!deployed) return { ...base, supplied: 0, borrowed: 0, liquidity: 0, utilization: 0, borrowApy: null, supplyApy: null };
 
-  const [params, state] = await Promise.all([
+  const [params, raw] = await Promise.all([
     getMarketParams(publicClient, deployed.id),
     getMarketState(publicClient, deployed.id),
   ]);
+  // Accrued, so "supplied" and "borrowed" are what the market owes now rather than at whatever
+  // transaction last touched it.
+  const state = await accrued(publicClient, params, raw).catch(() => raw);
   const rates = await getRates(publicClient, params, state).catch(() => null);
   const unit = 10 ** (def.loan === "USDG" ? USDG_DECIMALS : 18);
 
@@ -110,11 +114,12 @@ export async function describePosition(marketKey: string, user: `0x${string}`) {
   const deployed = deployments.markets[def.key];
   if (!deployed) throw new Error(`${def.key} is not created on chain yet`);
 
-  const [params, state, position] = await Promise.all([
+  const [params, raw, position] = await Promise.all([
     getMarketParams(publicClient, deployed.id),
     getMarketState(publicClient, deployed.id),
     getPosition(publicClient, deployed.id, user),
   ]);
+  const state = await accrued(publicClient, params, raw);
 
   const price = await publicClient.readContract({
     address: params.oracle,

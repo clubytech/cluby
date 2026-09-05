@@ -1,4 +1,5 @@
 import type { Hex } from "viem";
+import { isAddress } from "viem";
 import { creditRegistryAbi } from "@cluby/abi";
 import { deployments } from "@cluby/config";
 import { alert } from "./alerts.ts";
@@ -17,7 +18,28 @@ export async function scorePass() {
 
   const res = await fetch(`${PONDER_URL}/scores`).catch(() => null);
   if (!res?.ok) return;
-  const rows = (await res.json()) as { id: Hex; score: number }[];
+  const body = await res.json().catch(() => null);
+  if (!Array.isArray(body)) {
+    log("scores: the indexer returned something that is not a list");
+    return;
+  }
+
+  // Every element here arrives over unauthenticated HTTP and ends up in a signed transaction from
+  // an address the registry trusts. The contract bounds the VALUE at 1000; nothing bounds WHOSE
+  // address is in the array, so an indexer that has been tampered with could publish a score
+  // against anyone. Shape-check before signing, not after.
+  const rows: { id: Hex; score: number }[] = [];
+  let dropped = 0;
+  for (const row of body as { id?: unknown; score?: unknown }[]) {
+    const id = typeof row?.id === "string" ? row.id : "";
+    const score = typeof row?.score === "number" ? row.score : NaN;
+    if (!isAddress(id) || !Number.isInteger(score) || score < 0 || score > 1000) {
+      dropped++;
+      continue;
+    }
+    rows.push({ id: id as Hex, score });
+  }
+  if (dropped > 0) log(`scores: dropped ${dropped} malformed row(s)`);
   if (rows.length === 0) return;
 
   const onChain = await Promise.all(

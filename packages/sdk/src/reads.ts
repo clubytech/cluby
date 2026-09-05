@@ -10,7 +10,7 @@ import {
   uniswapV3PoolAbi,
   vaultAbi,
 } from "./abi.ts";
-import { rateToApy, toAssetsDown } from "./math.ts";
+import { rateToApy, toAssetsUp, toSharesDown } from "./math.ts";
 import type { MarketParams } from "./market-id.ts";
 
 const BLUE = morpho.blue.address as Address;
@@ -42,6 +42,67 @@ export async function getMarketState(client: PublicClient, id: `0x${string}`): P
   };
 }
 
+const WAD = 10n ** 18n;
+
+/** Morpho compounds continuously; this is the Taylor form the protocol itself uses. */
+function wTaylorCompounded(rate: bigint, elapsed: bigint): bigint {
+  const first = rate * elapsed;
+  const second = (first * first) / WAD / 2n;
+  const third = (second * first) / WAD / 3n;
+  return first + second + third;
+}
+
+/**
+ * Market state with the interest Morpho has not written down yet added in.
+ *
+ * Morpho only accrues on interaction, so `getMarketState` returns totals frozen at whatever
+ * transaction last touched the market — which for a quiet market is hours ago. Reading a debt or a
+ * health factor off that state understates the debt by the whole pending interval, and understates
+ * it in the direction that makes a position look safer than it is. `Lens` has always done this
+ * replay on chain; this is the same arithmetic for callers that read through the SDK.
+ */
+export async function accrued(
+  client: PublicClient,
+  params: MarketParams,
+  state: MarketState,
+  now: bigint = BigInt(Math.floor(Date.now() / 1000)),
+): Promise<MarketState> {
+  const elapsed = now > state.lastUpdate ? now - state.lastUpdate : 0n;
+  if (elapsed === 0n) return state;
+  if (state.totalBorrowAssets === 0n) return { ...state, lastUpdate: now };
+
+  const rate = await client.readContract({
+    address: (params.irm === "0x0000000000000000000000000000000000000000" ? IRM : params.irm) as Address,
+    abi: irmAbi,
+    functionName: "borrowRateView",
+    args: [params, state],
+  });
+
+  const interest = (state.totalBorrowAssets * wTaylorCompounded(rate, elapsed)) / WAD;
+  const next: MarketState = {
+    ...state,
+    totalBorrowAssets: state.totalBorrowAssets + interest,
+    totalSupplyAssets: state.totalSupplyAssets + interest,
+    lastUpdate: now,
+  };
+
+  if (state.fee !== 0n) {
+    const feeAmount = (interest * state.fee) / WAD;
+    // Fee shares are minted against supply excluding the fee itself, as Morpho does.
+    next.totalSupplyShares += toSharesDown(feeAmount, next.totalSupplyAssets - feeAmount, state.totalSupplyShares);
+  }
+  return next;
+}
+
+/** Read the market and add the pending interest in one call. What a UI should be using. */
+export async function getAccruedMarketState(
+  client: PublicClient,
+  id: `0x${string}`,
+  params: MarketParams,
+): Promise<MarketState> {
+  return accrued(client, params, await getMarketState(client, id));
+}
+
 /** Borrow rate the market charges right now, compounded to a yearly figure. */
 export async function getRates(client: PublicClient, params: MarketParams, state: MarketState) {
   const perSecond = await client.readContract({
@@ -68,9 +129,16 @@ export async function getPosition(
   return { supplyShares: p[0], borrowShares: p[1], collateral: p[2] };
 }
 
-/** Debt in loan-token units, rounded the way Morpho rounds it against the borrower. */
+/**
+ * Debt in loan-token units, rounded UP — the way Morpho rounds it against the borrower. It used to
+ * round down under a comment claiming it did this, which is a wei, and a wei does not matter.
+ *
+ * What matters is `state`: pass it accrued, from `getAccruedMarketState` or `accrued`. Raw state
+ * from `getMarketState` is frozen at the market's last interaction, so the debt it produces is
+ * short by every second since, and short in the direction that flatters the position.
+ */
 export function debtOf(position: PositionState, state: MarketState) {
-  return toAssetsDown(position.borrowShares, state.totalBorrowAssets, state.totalBorrowShares);
+  return toAssetsUp(position.borrowShares, state.totalBorrowAssets, state.totalBorrowShares);
 }
 
 export const getOraclePrice = (client: PublicClient, oracle: Address) =>

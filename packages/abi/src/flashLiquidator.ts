@@ -125,6 +125,19 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "function",
+    "name": "maxSlippageWad",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "morpho",
     "inputs": [],
     "outputs": [
@@ -238,6 +251,19 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "function",
+    "name": "setMaxSlippage",
+    "inputs": [
+      {
+        "name": "newMaxSlippageWad",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "sweep",
     "inputs": [
       {
@@ -320,6 +346,19 @@ export const flashLiquidatorAbi = [
   },
   {
     "type": "event",
+    "name": "MaxSlippageSet",
+    "inputs": [
+      {
+        "name": "maxSlippageWad",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OwnershipTransferStarted",
     "inputs": [
       {
@@ -355,6 +394,22 @@ export const flashLiquidatorAbi = [
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "BelowOracleFloor",
+    "inputs": [
+      {
+        "name": "received",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "floor",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
@@ -414,5 +469,10 @@ export const flashLiquidatorAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "SlippageTooHigh",
+    "inputs": []
   }
 ] as const;

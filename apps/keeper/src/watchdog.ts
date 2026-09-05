@@ -2,7 +2,7 @@ import type { Hex } from "viem";
 import { marketCatalog, stocks, nativeTokens, tokens } from "@cluby/config";
 import { readTwap, readPoolHealth } from "@cluby/sdk";
 import { alert } from "./alerts.ts";
-import { DIVERGENCE_BPS, MARKETS, log, pub } from "./env.ts";
+import { DIVERGENCE_BPS, GAS_FLOOR, MARKETS, account, log, pub } from "./env.ts";
 
 const ORACLE_SCALE = 10n ** 36n;
 
@@ -23,6 +23,8 @@ const tokenFor = (symbol: string) =>
  * divergence. So it tells a human, precisely, what it saw and what to do about it.
  */
 export async function watchdogPass() {
+  await checkGas();
+
   for (const [key, deployed] of Object.entries(MARKETS)) {
     const def = marketCatalog.find((m) => m.key === key);
     if (!def) continue;
@@ -75,5 +77,30 @@ export async function watchdogPass() {
         `${key}: the oracle says ${oracleHuman.toFixed(2)} and the pool says ${twap.price.toFixed(2)} — ${(divergenceBps / 100).toFixed(2)}% apart. Set this market's cap to 0 in the vault and pull the liquidity until they agree.`,
       );
     }
+  }
+}
+
+/**
+ * A signing key with no gas is a keeper that watches an underwater position and cannot act on it.
+ * Nothing was checking this: the first symptom was `scores failed: … exceeds the balance` buried in
+ * a log line nobody reads, and the same key signs liquidations.
+ */
+async function checkGas() {
+  if (!account) return;
+  let balance: bigint;
+  try {
+    balance = await pub.getBalance({ address: account.address });
+  } catch (e) {
+    log("could not read the keeper's gas balance:", (e as Error).message);
+    return;
+  }
+
+  const eth = Number(balance) / 1e18;
+  log(`keeper gas ${eth.toFixed(5)} ETH`);
+  if (balance < GAS_FLOOR) {
+    await alert(
+      `gas-low:${account.address}`,
+      `Keeper ${account.address} is down to ${eth.toFixed(5)} ETH of gas. Below this it cannot send a liquidation, and it will fail silently at the moment it is most needed. Top it up.`,
+    );
   }
 }
