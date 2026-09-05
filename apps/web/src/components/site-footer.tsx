@@ -20,6 +20,7 @@ const columns = [
       { href: "/docs#withdrawals", label: "Withdrawals" },
       { href: "/docs#flash-loans", label: "Flash loans" },
       { href: "/builders", label: "Builders" },
+      { href: "/launchpad", label: "Launchpad — soon" },
     ],
   },
 ];

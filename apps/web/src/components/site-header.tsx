@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ConnectButton } from "./connect-button";
 
-const nav = [
+const nav: { href: string; label: string; soon?: boolean }[] = [
   { href: "/earn", label: "Earn" },
   { href: "/borrow", label: "Borrow" },
   { href: "/stake", label: "Stake" },
@@ -14,6 +14,7 @@ const nav = [
   { href: "/stats", label: "Stats" },
   { href: "/docs", label: "Docs" },
   { href: "/builders", label: "Builders" },
+  { href: "/launchpad", label: "Launchpad", soon: true },
 ];
 
 export function SiteHeader() {
@@ -44,6 +45,11 @@ export function SiteHeader() {
                     }`}
                   >
                     {item.label}
+                    {item.soon && (
+                      <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-text-faint">
+                        soon
+                      </span>
+                    )}
                   </Link>
                 );
               })}
