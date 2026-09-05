@@ -1,0 +1,9 @@
+[Unit]
+Description=Tell a human that %i died
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/cluby/.env
+# %i is the unit that failed, passed in by its OnFailure=. Everything this needs is already in the
+# same env file the services read, so there is no second place to keep the token.
+ExecStart=/opt/cluby/alert-unit.sh %i

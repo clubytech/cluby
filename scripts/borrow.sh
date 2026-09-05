@@ -27,16 +27,14 @@ BOR_UNITS=$(python3 -c "print(int($BORROW * 10**6))")
 gas_price() { python3 -c "print(int($(cast base-fee) * 2))"; }
 export ETH_RPC_URL="$RPC"
 
-# The key is read here and never crosses a shell prompt.
-if [ -z "${PRIVATE_KEY:-}" ]; then echo "PRIVATE_KEY missing from .env"; exit 1; fi
-FROM=$(cast wallet address --private-key "$PRIVATE_KEY")
+. ./scripts/lib/signer.sh
 echo "signing as $FROM"
 
 ALLOWANCE=$(cast call "$NVDA" "allowance(address,address)(uint256)" "$FROM" "$MORPHO" | awk '{print $1}')
 if [ "$(python3 -c "print(1 if $ALLOWANCE < $COL_UNITS else 0)")" = "1" ]; then
   echo "approving Morpho for $COLLATERAL NVDA"
   cast send "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS" \
-    --private-key "$PRIVATE_KEY" --gas-limit 200000 --gas-price "$(gas_price)" >/dev/null
+    "${SIGNER[@]}" --gas-limit 200000 --gas-price "$(gas_price)" >/dev/null
 else
   echo "Morpho already approved for $(python3 -c "print($ALLOWANCE/1e18)") NVDA"
 fi
@@ -45,5 +43,5 @@ echo "posting $COLLATERAL NVDA and borrowing $BORROW USDG"
 cd contracts
 MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
 FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
-  --rpc-url "$RPC" --private-key "$PRIVATE_KEY" --broadcast --slow --with-gas-price "$(gas_price)" 2>&1 |
+  --rpc-url "$RPC" "${SIGNER[@]}" --broadcast --slow --with-gas-price "$(gas_price)" 2>&1 |
   grep -E "collateral posted|borrowed|health factor|liquidation price|collateral value|debt |Error|revert" || true

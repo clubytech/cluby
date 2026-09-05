@@ -22,7 +22,7 @@ PARAMS="($USDG,$NVDA,$ORACLE,$IRM,625000000000000000)"
 
 # The base fee here has moved between 0.4 and 10 gwei within an hour; take the current one.
 gas_price() { python3 -c "print(int($(cast base-fee) * 2))"; }
-FROM=$(cast wallet address --private-key "$PRIVATE_KEY")
+. ./scripts/lib/signer.sh
 
 read -r SUPPLY_SHARES BORROW_SHARES COLLATERAL <<<"$(cast call $MORPHO 'position(bytes32,address)(uint256,uint128,uint128)' $ID $FROM | awk '{print $1}' | tr '\n' ' ')"
 read -r TA TSH TB TBSH REST <<<"$(cast call $MORPHO 'market(bytes32)(uint128,uint128,uint128,uint128,uint128,uint128)' $ID | awk '{print $1}' | tr '\n' ' ')"
@@ -40,21 +40,21 @@ if [ "$BORROW_SHARES" != "0" ]; then
   ALLOW=$(python3 -c "print(int($DEBT * 1.02) + 1)")
   echo "==> approving Morpho for $(python3 -c "print(f'{$ALLOW/1e6:,.2f}')") USDG"
   cast send "$USDG" "approve(address,uint256)" "$MORPHO" "$ALLOW" \
-    --private-key "$PRIVATE_KEY" --gas-limit 200000 --gas-price "$(gas_price)" >/dev/null
+    "${SIGNER[@]}" --gas-limit 200000 --gas-price "$(gas_price)" >/dev/null
 
   # Repay by SHARES, not assets: interest accrues between quoting and landing, and an
   # assets-denominated "repay everything" leaves dust that keeps the collateral locked.
   echo "==> repaying the whole debt"
   cast send "$MORPHO" "repay((address,address,address,address,uint256),uint256,uint256,address,bytes)(uint256,uint256)" \
     "$PARAMS" 0 "$BORROW_SHARES" "$FROM" 0x \
-    --private-key "$PRIVATE_KEY" --gas-limit 400000 --gas-price "$(gas_price)" | grep -E "^status" || true
+    "${SIGNER[@]}" --gas-limit 400000 --gas-price "$(gas_price)" | grep -E "^status" || true
 fi
 
 if [ "$COLLATERAL" != "0" ]; then
   echo "==> withdrawing $(python3 -c "print(f'{$COLLATERAL/1e18:.6f}')") NVDA"
   cast send "$MORPHO" "withdrawCollateral((address,address,address,address,uint256),uint256,address,address)" \
     "$PARAMS" "$COLLATERAL" "$FROM" "$FROM" \
-    --private-key "$PRIVATE_KEY" --gas-limit 400000 --gas-price "$(gas_price)" | grep -E "^status" || true
+    "${SIGNER[@]}" --gas-limit 400000 --gas-price "$(gas_price)" | grep -E "^status" || true
 fi
 
 echo

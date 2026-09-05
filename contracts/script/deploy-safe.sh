@@ -13,6 +13,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 set -a; . ./.env; set +a
+. ./scripts/lib/signer.sh
 
 SINGLETON=0x29fcB43b46531BcA003ddC8FCB67FFE91900C762   # SafeL2 1.4.1 (L2 variant: emits events)
 FACTORY=0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67     # SafeProxyFactory 1.4.1
@@ -46,7 +47,7 @@ if [ "${BROADCAST:-0}" != "1" ]; then echo "(dry run; re-run with BROADCAST=1)";
 
 cast send "$FACTORY" 'createProxyWithNonce(address,bytes,uint256)(address)' \
   "$SINGLETON" "$INIT" "$SALT" \
-  --private-key "$PRIVATE_KEY" --rpc-url "$ROBINHOOD_RPC_URL"
+  "${SIGNER[@]}" --rpc-url "$ROBINHOOD_RPC_URL"
 
 echo "--- verifying deployed Safe ---"
 cast call "$PREDICTED" 'getThreshold()(uint256)' --rpc-url "$ROBINHOOD_RPC_URL"

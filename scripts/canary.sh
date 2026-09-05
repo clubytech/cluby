@@ -10,6 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
+. ./scripts/lib/signer.sh
 
 VAULT=0x97e813828B0250dCa5c05FF2567dfD616E5b3C61
 USDG=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
@@ -49,7 +50,7 @@ send() {
     # The limit is a ceiling, not a charge: unused gas is never billed, so it is set generously.
     # A deposit that allocates into a market costs ~354k, and the 300k this script first used ran
     # out of gas — which looks exactly like a revert unless you read the receipt.
-    if out=$(cast send "$@" --private-key "$PRIVATE_KEY" --gas-limit 1500000 --gas-price "$(gas_price)" 2>&1); then
+    if out=$(cast send "$@" "${SIGNER[@]}" --gas-limit 1500000 --gas-price "$(gas_price)" 2>&1); then
       if echo "$out" | grep -q "status *1"; then
         return 0
       fi
@@ -85,7 +86,7 @@ send "approve Morpho" "$NVDA" "approve(address,uint256)" "$MORPHO" "$COL_UNITS"
 say "4/4  post collateral and borrow $BORROW USDG"
 (cd contracts && MARKET=NVDA MARKET_ID="$MARKET_ID" LENS="$LENS" COLLATERAL="$COL_UNITS" BORROW="$BOR_UNITS" \
   FOUNDRY_PROFILE=deploy forge script script/SeedMarket.s.sol \
-  --rpc-url "$ETH_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast --slow \
+  --rpc-url "$ETH_RPC_URL" "${SIGNER[@]}" --broadcast --slow \
   --with-gas-price "$(gas_price)") 2>&1 | grep -E "health factor|liquidation price|collateral value|debt|borrowed|Error" || true
 
 say "After"
