@@ -47,6 +47,10 @@ function withTokenState(items: Item[], tokenLive: boolean): Item[] {
   return items.map((i) => (i.href === "/token" ? { ...i, soon: !tokenLive } : i));
 }
 
+/** The menu's height transition, in milliseconds. The class below and the timer above read this
+ * same number; two places that must agree should not each hold their own copy of it. */
+const MENU_MS = 300;
+
 function Soon() {
   return (
     <span className="ml-1.5 rounded-full bg-brand-bright/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-brand-bright">
@@ -70,6 +74,23 @@ export function SiteHeader({
 
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  /**
+   * Is the bar taller than one line RIGHT NOW — including while it is on its way back to one?
+   *
+   * `open` is the intent and changes instantly; this is the geometry and lags it by the length of
+   * the height transition. They are different questions and the radius depends on the second.
+   */
+  const [boxy, setBoxy] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setBoxy(true);
+      return;
+    }
+    const t = setTimeout(() => setBoxy(false), MENU_MS);
+    // Cleared if it reopens mid-close, so a fast double tap cannot leave it round while tall.
+    return () => clearTimeout(t);
+  }, [open]);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -134,9 +155,16 @@ export function SiteHeader({
             // enormous number while the height was already growing — and a browser clamps a radius
             // to half the shorter side, so a 700px-tall box with a 5000px radius is drawn as a
             // circle. That is exactly what it looked like: the menu opened as a giant dark disc and
-            // then popped into a panel. Two properties animating against each other, where only one
-            // of them ever needed to.
-            open ? "rounded-[28px]" : "rounded-full"
+            // then popped into a panel.
+            //
+            // Snapping on `open` fixed the opening and broke the closing in the same way, which is
+            // the more interesting half. On close, `open` goes false instantly while the height
+            // spends another 300ms travelling back down, so the pill radius returned to a box that
+            // was still tall — and drew the circle again on the way out. The radius follows `boxy`
+            // instead: true the moment it opens, and false only once the height has finished
+            // collapsing. The shape is round exactly when the box is one line tall and never
+            // otherwise.
+            boxy ? "rounded-[28px]" : "rounded-full"
           } ${
             scrolled
               ? "shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_16px_44px_-22px_rgba(0,43,56,0.95)]"
@@ -256,9 +284,15 @@ export function SiteHeader({
 
           {/* Height-animated rather than mounted and unmounted, so opening the menu is a movement
               and not a jump. */}
+          {/* `minmax(0,…)` rather than a bare `0fr`, and that is the whole reason the bar was
+              lopsided. A track written as `0fr` means `minmax(auto, 0fr)`, and an `auto` minimum
+              still reserves the content's min-content height — padding included, since padding
+              cannot be shrunk away by `min-height: 0`. So the closed menu was 16px tall, not zero,
+              and it pushed the logo up: twelve pixels of air above it and twenty-eight below.
+              Forcing the minimum to zero makes closed mean closed. */}
           <div
             className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out xl:hidden ${
-              open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              open ? "grid-rows-[minmax(0,1fr)]" : "grid-rows-[minmax(0,0fr)]"
             }`}
           >
             <nav className="flex min-h-0 flex-col gap-1 px-2 pt-4">
