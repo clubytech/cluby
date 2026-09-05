@@ -3,6 +3,7 @@ import { Badge, Card, SectionHeading } from "@/components/ui";
 import { deployments } from "@cluby/config";
 import { getProtocolStats } from "@/lib/markets";
 import { getTokenListing } from "@/lib/token-listing";
+import { getIncentives } from "@/lib/incentives";
 import { pct, usd } from "@/lib/format";
 
 /**
@@ -20,6 +21,42 @@ export const metadata = {
     "Where the Cluby token's value comes from, what it will and will not control, and what is still undecided.",
 };
 
+/** A value that failed to read renders as this, never as zero. */
+const UNREAD = "could not read";
+
+/**
+ * A number that came off the chain, with the address it came from underneath it.
+ *
+ * The address is the point. Every protocol's token page has numbers on it; almost none of them can
+ * be checked, and a reader who has been rugged before knows that. Printing the contract next to the
+ * figure turns "trust us" into "go and look" — and it commits us, because the page and the chain
+ * now have to agree in public.
+ */
+function Onchain({
+  label,
+  value,
+  address,
+  note,
+}: {
+  label: string;
+  value: string;
+  address?: string | null;
+  note: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-b border-line py-6 last:border-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-soft">{label}</p>
+        <p className="num text-2xl font-bold tracking-tight text-text-strong">{value}</p>
+      </div>
+      <p className="text-sm leading-relaxed text-text-soft">{note}</p>
+      {address && (
+        <p className="num mt-1 break-all text-xs text-text-soft/80">{address}</p>
+      )}
+    </div>
+  );
+}
+
 /** One fact and its consequence, side by side. */
 function Row({ k, v, note }: { k: string; v: string; note: string }) {
   return (
@@ -32,7 +69,11 @@ function Row({ k, v, note }: { k: string; v: string; note: string }) {
 }
 
 export default async function TokenPage() {
-  const [stats, listing] = await Promise.all([getProtocolStats(), getTokenListing()]);
+  const [stats, listing, chain] = await Promise.all([
+    getProtocolStats(),
+    getTokenListing(),
+    getIncentives(),
+  ]);
   const e = stats.economics;
 
   const stakerShare = e.feeSplit.stakers;
@@ -101,6 +142,129 @@ export default async function TokenPage() {
               What is undecided is said so, plainly, further down.
             </p>
           )}
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* The machinery, read off the chain                                 */}
+      {/* ---------------------------------------------------------------- */}
+      <section className="bg-white">
+        <div className="container-padding section-y flex flex-col gap-10">
+          <SectionHeading
+            align="left"
+            title="The machinery exists. Here it is, and here is what it holds."
+            lead="Every number in this section is read from a contract when this page is built, not typed into it. The addresses are printed so you can fetch the same values yourself and catch us if they ever disagree."
+          />
+
+          <Card className="border border-line">
+            <Onchain
+              label="Rebates are paid by"
+              value={
+                chain.epochsPublished === null
+                  ? UNREAD
+                  : `${chain.epochsPublished} epoch${chain.epochsPublished === 1 ? "" : "s"}`
+              }
+              address={chain.distributor}
+              note="A Merkle distributor holding USDG. It refuses to publish an epoch its own balance cannot cover, so a published root is money that is already sitting in the contract — not an IOU, and not a race between the people who claim first and the people who claim late. Nothing has been published yet, and this page will say so until something has."
+            />
+            <Onchain
+              label="Waiting to be claimed"
+              value={
+                chain.fundedUsdg === null
+                  ? UNREAD
+                  : `$${chain.fundedUsdg.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+              }
+              note="USDG held by that contract right now. Until the performance fee is switched on there is nothing to fund it with, and this reads zero. That is the honest number and it is the one we show."
+            />
+            <Onchain
+              label="Paid out so far"
+              value={
+                chain.distributedUsdg === null
+                  ? UNREAD
+                  : `$${chain.distributedUsdg.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
+              }
+              note="Summed across every epoch's claim total. It moves the moment the first borrower claims, and no sooner."
+            />
+            <Onchain
+              label="Performance fee today"
+              value={chain.vaultFeeWad === null ? UNREAD : `${(Number(chain.vaultFeeWad) / 1e16).toFixed(0)}%`}
+              address={chain.vaultOwner ?? chain.vault}
+              note={`Read from the vault itself. It is zero, so there is no revenue to split yet — and a page that shows a split without showing that the numerator is zero is lying by arrangement. Changing it is a call only the address above can make, and that address is a Safe, not a person's wallet.`}
+            />
+            <Onchain
+              label="Notice before any change takes effect"
+              value={
+                chain.timelockSeconds === null
+                  ? UNREAD
+                  : chain.timelockSeconds >= 3600
+                    ? `${Math.round(chain.timelockSeconds / 3600)} hours`
+                    : `${chain.timelockSeconds} seconds`
+              }
+              note="The vault's timelock, on chain. A fee rise, a new market, a cap increase — each is submitted publicly and cannot execute until this has elapsed, which is long enough for anyone who dislikes it to withdraw first. The guardian role can veto inside that window."
+            />
+            <Onchain
+              label="Scores are recorded in"
+              value="0–1000"
+              address={chain.registry}
+              note="The credit registry. The keeper publishes scores hourly; the contract stores the value and the time it was written, so anyone reading it can see how stale it is and refuse to act on an old one."
+            />
+          </Card>
+
+          {/* ------------------------------------------------------------ */}
+          {/* The rule, stated so it can be checked                         */}
+          {/* ------------------------------------------------------------ */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card className="border border-line">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-soft">
+                How a rebate is worked out
+              </p>
+              <ol className="mt-4 flex flex-col gap-3 text-sm leading-relaxed text-text-soft">
+                <li>
+                  <span className="font-bold text-text-strong">1.</span> The week&apos;s interest is
+                  totalled per borrower from the chain&apos;s own events — not from our database.
+                  Anyone with an RPC endpoint can reproduce the input.
+                </li>
+                <li>
+                  <span className="font-bold text-text-strong">2.</span> Each borrower&apos;s share
+                  is scaled by their score, which rises with repaid debt and time without a
+                  liquidation, and falls when a position is liquidated.
+                </li>
+                <li>
+                  <span className="font-bold text-text-strong">3.</span> The treasury sends the USDG
+                  to the distributor <em>first</em>. Then the root is published. The contract will
+                  not accept it in the other order.
+                </li>
+                <li>
+                  <span className="font-bold text-text-strong">4.</span> You claim your own leaf.
+                  Unclaimed money stays claimable for ninety days before it can be swept back, so
+                  being slow costs you nothing.
+                </li>
+              </ol>
+            </Card>
+
+            <Card className="border border-line">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-soft">
+                What the score is not allowed to do
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-text-soft">
+                It cannot change what you may borrow. Not by a basis point. The registry is read
+                when a rebate is computed and at no other moment — the LLTV that decides your
+                liquidation is fixed in the market at creation and cannot be edited by us, by a
+                score, or by anyone.
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-text-soft">
+                This is the line that keeps an off-chain number from becoming a risk parameter. A
+                score that could raise your leverage would be a spreadsheet standing between a
+                lender and their money. The worst a broken score can do here is send someone the
+                wrong rebate, and that is corrected by publishing the next epoch rather than by
+                unwinding the last one.
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-text-soft">
+                Only two addresses may write a score, and one of them is a Safe. The key that
+                previously held that right was retired and revoked on chain when it was lost.
+              </p>
+            </Card>
+          </div>
         </div>
       </section>
 

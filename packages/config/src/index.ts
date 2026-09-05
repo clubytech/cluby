@@ -748,6 +748,15 @@ export const deployments: {
    */
   tokenRegistry: "0xD0A32d0bA6efa91b2637af14fD1580FE3ddB337A",
   /**
+   * Where rebates are actually paid, in USDG, weekly.
+   *
+   * In USDG rather than in the token, deliberately: a rebate denominated in a token that does not
+   * exist yet is not a rebate, it is a promise about a launch. This pays in the asset borrowers
+   * already owe, from the day the first fee is taken, and it refuses to publish an epoch its own
+   * balance cannot cover — so a published root is money that is already here.
+   */
+  merkleDistributor: "0x34A7958C9C2bb5Cc2806ECd31c756A8e083C3965",
+  /**
    * Safe 1.4.1+L2, 1-of-1 on the deploy key for now — add owners and raise the threshold from the
    * Safe itself. It owns the vault, the liquidator and the credit registry; the deploy key owns
    * nothing any more.
