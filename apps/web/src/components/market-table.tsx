@@ -6,6 +6,7 @@ import type { MarketView } from "@/lib/markets";
 import { pct, usd } from "@/lib/format";
 import { Badge } from "./ui";
 import { MarketLogo } from "./market-logo";
+import { Pill, useSlidingPill } from "./sliding-pill";
 
 const statusTone = { listed: "live", planned: "pending", blocked: "neutral" } as const;
 const statusLabel = { listed: "Live", planned: "Listing", blocked: "Blocked" } as const;
@@ -13,6 +14,8 @@ const statusLabel = { listed: "Live", planned: "Listing", blocked: "Blocked" } a
 export function MarketTable({ markets, showFilters = true }: { markets: MarketView[]; showFilters?: boolean }) {
   const [side, setSide] = useState<"long" | "short">("long");
   const [category, setCategory] = useState<string>("All");
+  const sideToggle = useSlidingPill<HTMLDivElement>([side]);
+  const categoryBar = useSlidingPill<HTMLDivElement>([category, side]);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(markets.filter((m) => m.side === side).map((m) => m.category)))],
@@ -27,33 +30,39 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
     <div className="flex flex-col gap-5">
       {showFilters && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex rounded-full border border-line p-1">
+          <div ref={sideToggle.ref} className="relative flex w-fit rounded-full border border-line p-1">
+            <Pill pill={sideToggle.pill} className="my-1 bg-bg-strong" />
             {(["long", "short"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
+                data-active={side === s ? "true" : undefined}
                 onClick={() => {
                   setSide(s);
                   setCategory("All");
                 }}
-                className={`press rounded-full px-5 py-2 text-sm capitalize transition-all duration-200 ${
-                  side === s ? "bg-bg-strong text-white" : "text-text-soft hover:text-text-strong"
+                className={`relative z-10 rounded-full px-5 py-2 text-sm capitalize transition-colors duration-300 ${
+                  side === s ? "text-white" : "text-text-soft hover:text-text-strong"
                 }`}
               >
                 {s === "long" ? "Borrow against" : "Short a stock"}
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div ref={categoryBar.ref} className="relative flex flex-wrap gap-2">
+            {/* Only travels while the row stays on one line; once it wraps the pill would have to
+                jump a row, which reads worse than not moving. */}
+            <Pill pill={categoryBar.pill} className="hidden border border-brand bg-brand/10 sm:block" />
             {categories.map((c) => (
               <button
                 key={c}
                 type="button"
+                data-active={category === c ? "true" : undefined}
                 onClick={() => setCategory(c)}
-                className={`press rounded-full border px-4 py-1.5 text-xs transition-all duration-200 ${
+                className={`relative z-10 rounded-full border px-4 py-1.5 text-xs transition-colors duration-300 ${
                   category === c
-                    ? "border-brand bg-brand/10 text-brand"
-                    : "border-line text-text-soft hover:border-text-soft"
+                    ? "border-transparent text-brand sm:border-transparent"
+                    : "border-line text-text-soft hover:border-text-soft hover:text-text-strong"
                 }`}
               >
                 {c}

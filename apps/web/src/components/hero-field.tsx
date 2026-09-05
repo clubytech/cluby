@@ -35,26 +35,69 @@ function rand(seed: number): number {
 export function HeroField() {
   const root = useRef<HTMLDivElement>(null);
   const barsRef = useRef<HTMLDivElement>(null);
+  const tickersRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
 
-  // Scroll parallax. Separate from the wave: it is cheap, it runs on a different event, and mixing
-  // the two would make one of them stutter.
+  // Scroll parallax.
+  //
+  // Written straight onto the four elements that move, NOT into a custom property on the root.
+  // A custom property looks tidier and is the reason the page stuttered: changing one on
+  // `.hero-field` invalidates style for its whole subtree, and that subtree is sixty-odd nodes
+  // because the band alone holds 56 columns. Four direct writes to four elements touch four.
+  //
+  // It also stops completely once the hero has left the viewport. Past that the work is invisible
+  // by definition, and it was still running down the length of a page with forty market rows on it.
   useEffect(() => {
-    const el = root.current;
-    if (!el) return;
+    const host = root.current;
+    const bars = barsRef.current;
+    const tickers = tickersRef.current;
+    const glow = glowRef.current;
+    if (!host || !bars || !tickers || !glow) return;
+
+    let visible = true;
+    let last = -1;
     let frame = 0;
-    const onScroll = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        // Only the first viewport matters; past it the hero is gone and the work is wasted.
-        const p = Math.min(1, window.scrollY / Math.max(1, window.innerHeight));
-        el.style.setProperty("--scroll", String(p));
-      });
+
+    const paint = () => {
+      frame = 0;
+      const p = Math.min(1, Math.max(0, window.scrollY / Math.max(1, window.innerHeight)));
+      // Below a hundredth nothing is visible, and the write is a style recalculation for nothing.
+      if (Math.abs(p - last) < 0.01) return;
+      last = p;
+      bars.style.transform = `translate3d(0, ${(p * 22).toFixed(2)}%, 0)`;
+      bars.style.opacity = String(1 - p * 0.9);
+      tickers.style.transform = `translate3d(0, ${(p * 30).toFixed(2)}%, 0)`;
+      tickers.style.opacity = String(1 - p);
+      glow.style.transform = `translate3d(0, ${(p * 26).toFixed(2)}%, 0)`;
     };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
+
+    const onScroll = () => {
+      if (!visible || frame) return;
+      frame = requestAnimationFrame(paint);
+    };
+
+    // Lenis owns the scroll position, so its event is the one that fires in step with the frame it
+    // is drawing. Falling back to the window keeps this working with momentum turned off.
+    type WithLenis = Window & { __lenis?: { on(e: "scroll", cb: () => void): void; off(e: "scroll", cb: () => void): void } };
+    const lenis = (window as WithLenis).__lenis;
+    if (lenis) lenis.on("scroll", onScroll);
+    else window.addEventListener("scroll", onScroll, { passive: true });
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        visible = entry?.isIntersecting ?? true;
+        host.dataset.idle = visible ? "false" : "true";
+        if (visible) onScroll();
+      },
+      { rootMargin: "100px" },
+    );
+    io.observe(host);
+
+    paint();
     return () => {
-      window.removeEventListener("scroll", onScroll);
+      io.disconnect();
+      if (lenis) lenis.off("scroll", onScroll);
+      else window.removeEventListener("scroll", onScroll);
       if (frame) cancelAnimationFrame(frame);
     };
   }, []);
@@ -161,7 +204,7 @@ export function HeroField() {
           const r2 = rand(i + 97);
           // A slow swell across the row keeps it from reading as noise.
           const swell = 0.45 + 0.55 * Math.sin((i / BAR_COUNT) * Math.PI);
-          const height = (14 + r * 62) * swell;
+          const height = (26 + r * 74) * swell;
           return (
             <span
               key={i}
@@ -180,7 +223,7 @@ export function HeroField() {
       </div>
 
       {/* Tickers drifting up through the band and dissolving. */}
-      <div className="hero-tickers" aria-hidden>
+      <div ref={tickersRef} className="hero-tickers" aria-hidden>
         {TICKERS.map((t, i) => {
           const r = rand(i + 401);
           return (
@@ -200,26 +243,35 @@ export function HeroField() {
       </div>
 
       {/* Ground glow and the fade that hands the headline back its contrast. */}
-      <div className="hero-glow" />
+      <div ref={glowRef} className="hero-glow" />
       <div className="hero-veil" />
     </div>
   );
 }
 
+// NOTE: this is a template literal, so a backtick anywhere below -- including inside a CSS comment
+// -- ends the string and produces a syntax error thirty lines later that looks like a CSS problem.
+// No backticks in here. It has cost an hour twice.
 const css = `
 .hero-field { --scroll: 0; }
+
+/* Off screen, the field stops entirely. 56 infinite animations on masked elements are real
+   compositing work, and paying for it down the length of a page that shows none of it is what a
+   scroll stutter is made of. */
+.hero-field[data-idle="true"] .hero-bar-fill,
+.hero-field[data-idle="true"] .hero-ticker {
+  animation-play-state: paused;
+}
 
 .hero-bars {
   position: absolute;
   inset-inline: 0;
-  bottom: 0;
-  height: 62%;
+  bottom: -12%;
+  height: 90%;
   display: flex;
   align-items: flex-end;
   gap: 0.3%;
   padding-inline: 2%;
-  transform: translate3d(0, calc(var(--scroll) * 22%), 0);
-  opacity: calc(1 - var(--scroll) * 0.9);
   will-change: transform, opacity;
 }
 
@@ -229,9 +281,10 @@ const css = `
   --duck: 0;
   flex: 1 1 0;
   height: var(--h);
-  /* transform is written directly by the wave; this is only the resting state. */
+  /* transform is written directly by the wave; this is only the resting state. No will-change here:
+     56 permanent compositor layers cost more than they save, and the transform composites while it
+     is actually moving regardless. */
   transform: translate3d(0, 0, 0);
-  will-change: transform;
 }
 
 .hero-bar-fill {
@@ -240,8 +293,8 @@ const css = `
   border-radius: 3px 3px 0 0;
   transform-origin: bottom;
   /* The top of a column is where it stops existing, not where it gets cut off. */
-  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, #000 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 62%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 62%, transparent 100%);
   /* Brighter than a wash: a hot cyan foot that carries most of the light, cooling as it rises. */
   background: linear-gradient(
     to top,
@@ -273,8 +326,7 @@ const css = `
   position: absolute;
   inset: 0;
   pointer-events: none;
-  transform: translate3d(0, calc(var(--scroll) * 30%), 0);
-  opacity: calc(1 - var(--scroll));
+  will-change: transform, opacity;
 }
 
 .hero-ticker {
@@ -297,12 +349,12 @@ const css = `
 .hero-glow {
   position: absolute;
   inset-inline: -10%;
-  bottom: -22%;
-  height: 52%;
+  bottom: -30%;
+  height: 56%;
   border-radius: 50%;
   background: radial-gradient(ellipse at center, rgb(0 150 175 / 0.5), transparent 65%);
   filter: blur(28px);
-  transform: translate3d(0, calc(var(--scroll) * 26%), 0);
+  will-change: transform;
 }
 
 .hero-veil {
@@ -311,10 +363,11 @@ const css = `
   background: linear-gradient(
     to bottom,
     var(--color-bg-deep) 0%,
-    rgb(0 27 36 / 0.86) 26%,
-    rgb(0 27 36 / 0.42) 48%,
-    rgb(0 27 36 / 0.04) 72%,
-    rgb(0 27 36 / 0.55) 100%
+    rgb(0 27 36 / 0.88) 22%,
+    rgb(0 27 36 / 0.5) 42%,
+    rgb(0 27 36 / 0.06) 64%,
+    rgb(0 27 36 / 0.35) 84%,
+    rgb(0 27 36 / 0.92) 100%
   );
 }
 

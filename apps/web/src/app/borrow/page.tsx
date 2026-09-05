@@ -19,16 +19,24 @@ export default async function BorrowPage() {
             Every market is isolated: a bad debt in one cannot touch another. Liquidation LTV and the
             oracle are fixed when the market is created and can never be changed.
           </p>
-          <div className="mt-10 grid grid-cols-2 gap-6 border-t border-line-dark pt-6 md:grid-cols-4">
+          <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
-              ["Markets", `${markets.length}`],
-              ["Available to borrow", usd(totalLiquidity)],
-              ["Stock LLTV", pct(0.625, 1)],
-              ["ETH LLTV", pct(0.77, 0)],
-            ].map(([l, v]) => (
-              <div key={l}>
-                <p className="text-[11px] uppercase tracking-widest text-white/50">{l}</p>
-                <p className="num mt-2 text-2xl">{v}</p>
+              ["Markets", `${markets.length}`, "every one isolated from the others"],
+              ["Available to borrow", usd(totalLiquidity), "across all of them, right now"],
+              ["Stock LLTV", pct(0.625, 1), "liquidation threshold on equities"],
+              ["ETH LLTV", pct(0.77, 0), "higher, because the exit is deeper"],
+            ].map(([l, v, note]) => (
+              <div
+                key={l}
+                className="shine-dark group rounded-2xl border border-line-dark bg-white/[0.03] p-5 transition-colors duration-300 hover:border-white/20 hover:bg-white/[0.06]"
+              >
+                <p className="text-[11px] uppercase tracking-widest text-white/50 transition-colors duration-300 group-hover:text-brand-bright">
+                  {l}
+                </p>
+                <p className="num mt-2 text-2xl transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
+                  {v}
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-white/40">{note}</p>
               </div>
             ))}
           </div>

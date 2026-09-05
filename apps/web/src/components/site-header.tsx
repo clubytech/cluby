@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConnectButton } from "./connect-button";
+import { Pill, useSlidingPill } from "./sliding-pill";
 
 type Item = { href: string; label: string; soon?: boolean };
 
@@ -45,41 +46,13 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLElement>(null);
-  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const moreActive = more.some((m) => isActive(m.href));
 
-  /**
-   * One pill that travels, rather than a background switching off one item and on at another.
-   *
-   * Measured from the DOM rather than computed from the label, because the pill has to land on the
-   * real thing at the real width — a font that loads late, or a "soon" badge, moves the target. It
-   * starts at null so the first paint has no pill to slide FROM: appearing in place is right on
-   * arrival, and sliding is right on every navigation after.
-   */
-  useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const measure = () => {
-      const el = nav.querySelector<HTMLElement>("[data-active='true']");
-      if (!el) return setPill(null);
-      // Rects, not offsetLeft: the More button sits inside its own positioned wrapper, so its
-      // offsetParent is that wrapper and its offsetLeft is zero. A rect is measured against the
-      // viewport and therefore does not care how anything is nested.
-      const a = el.getBoundingClientRect();
-      const b = nav.getBoundingClientRect();
-      setPill({ left: a.left - b.left, width: a.width });
-    };
-    measure();
-    // Fonts land after hydration and change every width in the bar.
-    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-    fonts?.ready.then(measure).catch(() => {});
-    const ro = new ResizeObserver(measure);
-    ro.observe(nav);
-    return () => ro.disconnect();
-  }, [pathname, moreActive, moreOpen]);
+  // The same travelling pill the market filters use — one implementation, two places.
+  const nav = useSlidingPill<HTMLElement>([pathname, moreActive]);
 
   // A dropdown that only closes on its own trigger is a dropdown people leave open by accident.
   useEffect(() => {
@@ -96,6 +69,38 @@ export function SiteHeader() {
     };
   }, [moreOpen]);
 
+  /**
+   * An outline once the page has moved, and none at the very top.
+   *
+   * At rest the bar sits on the hero and any edge on it is a line drawn across a photograph. As soon
+   * as content starts sliding under it, the same edge is what separates the two — so it appears then
+   * and not before.
+   *
+   * Driven off Lenis's scroll event where there is one, because that is the event that fires in
+   * step with the frame being drawn; a window listener would run at its own rate and the outline
+   * would flick a frame late. A boolean, not a number: it changes twice per page, so React re-renders
+   * twice rather than sixty times a second.
+   */
+  useEffect(() => {
+    const read = () => setScrolled(window.scrollY > 8);
+    type WithLenis = Window & { __lenis?: { on(e: "scroll", cb: () => void): void; off(e: "scroll", cb: () => void): void } };
+    const lenis = (window as WithLenis).__lenis;
+
+    // BOTH sources, not one. Lenis's event is the one that fires in step with the frame it is
+    // drawing, so the outline never lands late during a normal scroll. But it does not emit for
+    // every way the position can change — an immediate `scrollTo`, a hash jump, the browser
+    // restoring a position on a back navigation — and a header stuck in the wrong state after any
+    // of those is worse than one frame of lateness. Both is cheap: it is a boolean, and React
+    // bails out when it has not changed.
+    lenis?.on("scroll", read);
+    window.addEventListener("scroll", read, { passive: true });
+    read();
+    return () => {
+      lenis?.off("scroll", read);
+      window.removeEventListener("scroll", read);
+    };
+  }, []);
+
   // Navigating should close whatever is hanging open, on both breakpoints.
   useEffect(() => {
     setOpen(false);
@@ -105,7 +110,13 @@ export function SiteHeader() {
   return (
     <div className="sticky top-0 left-0 right-0 z-50 px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl gap-3">
-        <div className="mx-auto w-full rounded-full bg-bg-strong p-3 shadow-[0_10px_40px_-20px_rgba(0,43,56,0.8)]">
+        <div
+          className={`mx-auto w-full rounded-full bg-bg-strong p-3 transition-[box-shadow,background-color] duration-300 ease-out ${
+            scrolled
+              ? "shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_16px_44px_-22px_rgba(0,43,56,0.95)]"
+              : "shadow-[0_10px_40px_-20px_rgba(0,43,56,0.8)]"
+          }`}
+        >
           <div className="relative flex h-9 items-center justify-between px-2">
             <Link href="/" className="group flex items-center gap-2.5 text-text-white">
               <Image
@@ -120,20 +131,10 @@ export function SiteHeader() {
             </Link>
 
             <nav
-              ref={navRef}
+              ref={nav.ref}
               className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex"
             >
-              {/* The travelling pill. Transform and width, both composited, on the same curve as
-                  everything else that moves on this site. */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 -z-10 rounded-full bg-white/10 transition-[transform,width,opacity] duration-[420ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-                style={{
-                  width: pill ? `${pill.width}px` : 0,
-                  transform: `translateX(${pill?.left ?? 0}px)`,
-                  opacity: pill ? 1 : 0,
-                }}
-              />
+              <Pill pill={nav.pill} className="-z-10 bg-white/10" />
 
               {primary.map((item) => (
                 <Link

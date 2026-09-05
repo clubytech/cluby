@@ -34,7 +34,8 @@ export function SmoothScroll() {
     html.style.scrollBehavior = "auto";
 
     const lenis = new Lenis({
-      duration: 1.1,
+      // 1.1 read as draggy on a long page; 0.95 keeps the weight and lands sooner.
+      duration: 0.95,
       // Expo-out: quick to start, long soft landing. This is the curve that reads as weight.
       easing: (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
       // Touch devices already have momentum from the OS; adding ours on top feels wrong.

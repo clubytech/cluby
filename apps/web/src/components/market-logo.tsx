@@ -31,11 +31,15 @@ export function MarketLogo({ subject, size = 36 }: { subject: string; size?: num
 
   return (
     <span
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-line transition-all duration-250 ease-out group-hover:scale-110 group-hover:ring-brand/50"
+      className="block shrink-0 rounded-full ring-1 ring-line/60 transition-all duration-250 ease-out group-hover:scale-110 group-hover:ring-brand/50"
       style={{ width: px, height: px }}
     >
-      {/* A plain img, not next/image: these are tiny, already the right size, and the point of the
-          element is that it can fail and hand over to the chip. */}
+      {/* The disc is baked into the file: `normalise-logos.py` trims whatever margin the source
+          shipped with, scales the mark to a fixed share of the canvas and masks it to a circle, so
+          every one of these carries the same visual weight at the same size. Nothing here pads or
+          crops, because doing that per-render is what made them disagree in the first place.
+          A plain img, not next/image: they are already the right size, and the point of the element
+          is that it can fail and hand over to the chip. */}
       <img
         src={`/logos/${subject}.png`}
         alt=""
@@ -44,7 +48,7 @@ export function MarketLogo({ subject, size = 36 }: { subject: string; size?: num
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
-        className="h-full w-full object-contain p-1"
+        className="h-full w-full rounded-full"
       />
     </span>
   );
