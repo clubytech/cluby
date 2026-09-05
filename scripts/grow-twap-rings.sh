@@ -76,13 +76,26 @@ else
 fi
 export TARGET GAS_CEILING PER_SLOT FIXED FROM
 
-GP=$(python3 -c "print(int($(cast base-fee) * 2))")
+# Two numbers, and confusing them cost real planning. GP is the CEILING passed to --gas-price: it
+# has to sit above the base fee or the transaction is rejected outright when the base fee ticks up.
+# What is actually charged is the base fee itself, so every cost printed below uses that. Quoting
+# the ceiling made the bill look twice its size and held back growth that was affordable.
+BASE=$(cast base-fee)
+GP=$(python3 -c "print(int($BASE * 2))")
 RESERVE_WEI=$(python3 -c "print(int(float('$RESERVE_ETH') * 1e18))")
 
 cardinality_of() {
   cast call "$1" "slot0()(uint160,int24,uint16,uint16,uint16,uint8,bool)" | sed -n '4p' | awk '{print $1}'
 }
+# The TARGET the pool is already growing toward. Planning off the live cardinality alone would
+# re-buy slots that are bought and paid for, because the live number does not move until swaps wrap
+# the index -- which can be hours or days after the money has left.
+cardinality_next_of() {
+  cast call "$1" "slot0()(uint160,int24,uint16,uint16,uint16,uint8,bool)" | sed -n '5p' | awk '{print $1}'
+}
 eth() { python3 -c "print(f'{$1/1e18:.4f}')"; }
+# Cost of a gas amount at what will actually be charged, not at the ceiling.
+gas_eth() { python3 -c "print(f'{$1 * $BASE / 1e18:.4f}')"; }
 
 plan_for() {
   python3 -c '
@@ -110,21 +123,28 @@ ALL_STEPS=()
 while IFS=: read -r name pool; do
   [ -n "$ONLY" ] && [ "$ONLY" != "$name" ] && continue
   cur=$(cardinality_of "$pool")
+  nxt=$(cardinality_next_of "$pool")
   if [ "$cur" -ge "$TARGET" ]; then
-    printf "%-9s %4s -> already at or above %s\n" "$name" "$cur" "$TARGET"
+    printf "%-9s %4s -> at the window already\n" "$name" "$cur"
     continue
   fi
+  if [ "$nxt" -ge "$TARGET" ]; then
+    printf "%-9s %4s -> paid for (target %s), filling as swaps wrap the index\n" "$name" "$cur" "$nxt"
+    continue
+  fi
+  # Plan from whichever is further along: slots already bought do not need buying again.
+  [ "$nxt" -gt "$cur" ] && cur="$nxt"
   printf "%-9s %4s -> %s\n" "$name" "$cur" "$TARGET"
   while read -r to g; do
     [ -z "${to:-}" ] && continue
-    printf "    step -> %-5s %12s gas  %s ETH\n" "$to" "$g" "$(eth "$((g * GP))")"
+    printf "    step -> %-5s %12s gas  %s ETH\n" "$to" "$g" "$(gas_eth "$g")"
     total_gas=$((total_gas + g))
     ALL_STEPS+=("$name|$pool|$to|$g")
   done <<< "$(plan_for "$cur")"
 done <<< "$POOLS"
 
 echo
-printf "total %s gas, %s ETH\n" "$total_gas" "$(eth "$((total_gas * GP))")"
+printf "total %s gas, about %s ETH at the current base fee\n" "$total_gas" "$(gas_eth "$total_gas")"
 
 if [ -z "$SEND" ]; then
   echo "(nothing sent -- pass --send to do it)"
@@ -149,6 +169,8 @@ for step in "${ALL_STEPS[@]}"; do
   fi
 
   bal=$(cast balance "$FROM")
+  # Budgeted at the ceiling even though the charge is the base fee: running out mid-transaction
+  # burns everything, so the check is deliberately the pessimistic one.
   need=$(python3 -c "print($g * 12 // 10 * $GP + $RESERVE_WEI)")
   if [ "$(python3 -c "print(1 if $bal < $need else 0)")" = "1" ]; then
     echo "stopping: $name -> $to needs $(eth "$need") ETH including the reserve, and $(eth "$bal") is left." >&2
@@ -168,7 +190,7 @@ for step in "${ALL_STEPS[@]}"; do
     echo "  Not sending the rest: the same failure would cost the same again." >&2
     exit 1
   fi
-  echo "  ok, $used gas, $(eth "$((used * GP))") ETH   $hash"
+  echo "  ok, $used gas, $(gas_eth "$used") ETH   $hash"
 done
 
 echo
