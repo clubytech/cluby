@@ -98,7 +98,12 @@ export function SiteHeader() {
     <div className="sticky top-0 left-0 right-0 z-50 px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl gap-3">
         <div
-          className={`mx-auto w-full rounded-full bg-bg-strong p-3 transition-[box-shadow,background-color] duration-300 ease-out ${
+          className={`mx-auto w-full bg-bg-strong p-3 transition-[box-shadow,background-color,border-radius] duration-300 ease-out ${
+            // A pill only stays a pill while it is one line tall. `border-radius: 9999px` on a box
+            // that grows to fit ten menu items is an ellipse, and the items spill straight out of
+            // it. The radius has to become a corner as soon as the menu opens.
+            open ? "rounded-[28px]" : "rounded-full"
+          } ${
             scrolled
               ? "shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_16px_44px_-22px_rgba(0,43,56,0.95)]"
               : "shadow-[0_10px_40px_-20px_rgba(0,43,56,0.8)]"

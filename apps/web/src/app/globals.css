@@ -203,3 +203,18 @@
     transform: translateX(420%) skewX(-12deg);
   }
 }
+
+/* A table that scrolls sideways has to say so.
+ *
+ * Below lg the data tables are wider than the screen and scroll inside their own box, which is the
+ * right pattern for a grid of numbers — but a hard cut at the edge looks like the end of the
+ * content rather than the middle of it. This fades the right edge while there is more to reach, and
+ * the fade disappears at the end of the scroll because `scroll-timeline` drives it where supported.
+ * Where it is not supported the fade simply stays, which is still better than a cut. */
+@utility scroll-hint {
+  position: relative;
+  @media (width < 64rem) {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent 100%);
+  }
+}

@@ -72,7 +72,66 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-[28px] border border-line bg-white">
+      {/* Cards below lg, the table above it.
+          A 900px-wide table inside a horizontal scroller is not a phone layout — it is a desktop
+          layout the reader has to drag. The card carries the same seven figures in the order they
+          matter on a small screen: what it is, what it costs, what is there to take. */}
+      <div className="flex flex-col gap-3 lg:hidden">
+        {rows.map((m) => (
+          <div key={m.key} className="group rounded-3xl border border-line bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <MarketLogo subject={m.subject} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-text-strong">
+                    {m.side === "long" ? `${m.collateralSymbol} / ${m.loanSymbol}` : `Short ${m.subject}`}
+                  </p>
+                  <p className="truncate text-xs text-text-soft">
+                    {m.category} · {m.oracle === "twap" ? "TWAP" : m.oracle === "inverse" ? "inverse oracle" : "Chainlink"}
+                  </p>
+                </div>
+              </div>
+              <p className="num shrink-0 text-sm font-medium text-text-strong">
+                {m.price === null ? "—" : `$${m.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
+                {m.priceStale && <span className="ml-1.5 text-[10px] text-warn">stale</span>}
+              </p>
+            </div>
+
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+              {[
+                ["Liq. LTV", pct(m.lltv, 1)],
+                ["Available", m.status === "listed" ? usd(m.liquidityUsd) : "—"],
+                ["Borrow APR", pct(m.borrowApr)],
+                ["Cap", usd(m.supplyCapUsd, 0)],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-[10px] uppercase tracking-widest text-text-soft">{k}</dt>
+                  <dd className="num mt-0.5 text-sm text-text-strong">{v}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="mt-4">
+              {m.status === "blocked" ? (
+                <Badge tone="neutral">Blocked</Badge>
+              ) : (
+                <Link
+                  href={`/borrow/${m.key.toLowerCase()}`}
+                  className={`block rounded-full px-4 py-2.5 text-center text-sm font-medium transition-colors ${
+                    m.status === "listed"
+                      ? "bg-bg-strong text-white active:bg-brand"
+                      : "border border-line text-text-soft"
+                  }`}
+                >
+                  {m.status === "listed" ? (m.side === "long" ? "Borrow" : "Short") : "Details"}
+                </Link>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-[28px] border border-line bg-white lg:block">
         <table className="w-full min-w-[900px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">

@@ -68,7 +68,7 @@ export default async function BuildersPage() {
             ) : builders.length === 0 ? (
               <p className="num mt-6 text-xs text-text-soft">No routed volume yet.</p>
             ) : (
-              <div className="mt-6 overflow-x-auto">
+              <div className="scroll-hint mt-6 overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left">
                   <thead>
                     <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">

@@ -90,7 +90,7 @@ export default async function ActivityPage() {
               <p className="text-sm text-text-soft">Nothing has happened yet. The first row will be someone&apos;s deposit.</p>
             </Card>
           ) : (
-            <Card className="overflow-x-auto p-0">
+            <Card className="scroll-hint overflow-x-auto p-0">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-line text-left">
