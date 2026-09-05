@@ -55,9 +55,19 @@ FIXED=40000
 SEND=""
 [ "${1:-}" = "--send" ] && SEND=1
 
+# Every pool a TwapOracle reads or is meant to read. The first three price live markets; the rest
+# are census listings that cannot be created until their ring reaches the window, because the oracle
+# constructor refuses to build against a ring it cannot observe over.
 POOLS="HIMS:0xC8C90d3a1c1a24967E773ac2aD0d456BA3E31F64
 PONS:0x7A192E71564ec66eE0763e328a3Ac274942dE4e1
-CASHCAT:0x4B0c312fFbB068F6a0bEa128759E35d94B94D0E1"
+CASHCAT:0x4B0c312fFbB068F6a0bEa128759E35d94B94D0E1
+AMC:0xaA34feA710a1A737840329051D81D3B0B7C564d5
+TTWO:0xD9Ab4b7fAe6DC2f7020134Ec744A8F53Ef3E5E24
+DJT:0x31a89afd92F9397465649AD03226c52292fc1ae5
+GLD:0x7A6A053eCCf1446A2633E05aA6D40D09381997ec
+MRNA:0xA34d0667334074DF2d5BfD259e79E6B9cf1fA8Bf
+RIVN:0xb30A75B200D98A600a3766869344928E35823E23
+RBLX:0x2ef5945cd5664876b6481FdacFaA2942995a4DA8"
 
 if [ -n "$SEND" ]; then
   . ./scripts/lib/signer.sh
