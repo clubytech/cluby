@@ -72,7 +72,7 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
         </div>
       )}
 
-      <div data-lenis-prevent className="overflow-x-auto rounded-[28px] border border-line bg-white">
+      <div className="overflow-x-auto rounded-[28px] border border-line bg-white">
         <table className="w-full min-w-[900px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">

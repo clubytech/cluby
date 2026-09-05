@@ -76,12 +76,7 @@ export function HeroField() {
       frame = requestAnimationFrame(paint);
     };
 
-    // Lenis owns the scroll position, so its event is the one that fires in step with the frame it
-    // is drawing. Falling back to the window keeps this working with momentum turned off.
-    type WithLenis = Window & { __lenis?: { on(e: "scroll", cb: () => void): void; off(e: "scroll", cb: () => void): void } };
-    const lenis = (window as WithLenis).__lenis;
-    if (lenis) lenis.on("scroll", onScroll);
-    else window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -96,8 +91,7 @@ export function HeroField() {
     paint();
     return () => {
       io.disconnect();
-      if (lenis) lenis.off("scroll", onScroll);
-      else window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
       if (frame) cancelAnimationFrame(frame);
     };
   }, []);

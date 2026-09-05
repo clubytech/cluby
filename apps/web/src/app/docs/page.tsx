@@ -85,7 +85,6 @@ export default async function DocsPage() {
       <section className="bg-white">
         <div className="container-padding section-y flex flex-col gap-10 lg:flex-row">
           <nav
-            data-lenis-prevent
             className="lg:sticky lg:top-32 lg:h-fit lg:max-h-[calc(100vh-10rem)] lg:w-56 lg:shrink-0 lg:overflow-y-auto"
           >
             <p className="text-[11px] uppercase tracking-widest text-text-soft">On this page</p>

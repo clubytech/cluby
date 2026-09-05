@@ -38,7 +38,7 @@ export default async function StatsPage() {
       <section className="bg-white">
         <div className="container-padding section-y flex flex-col gap-8">
           <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px]">Oracle feeds</h2>
-          <div data-lenis-prevent className="overflow-x-auto rounded-[28px] border border-line">
+          <div className="overflow-x-auto rounded-[28px] border border-line">
             <table className="w-full min-w-[720px] text-left">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">

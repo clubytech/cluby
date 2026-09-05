@@ -76,29 +76,16 @@ export function SiteHeader() {
    * as content starts sliding under it, the same edge is what separates the two — so it appears then
    * and not before.
    *
-   * Driven off Lenis's scroll event where there is one, because that is the event that fires in
-   * step with the frame being drawn; a window listener would run at its own rate and the outline
-   * would flick a frame late. A boolean, not a number: it changes twice per page, so React re-renders
-   * twice rather than sixty times a second.
+   * A boolean, not a number: it changes twice per page, so React re-renders twice rather than
+   * sixty times a second, and the listener stays a two-line passive one.
    */
   useEffect(() => {
     const read = () => setScrolled(window.scrollY > 8);
-    type WithLenis = Window & { __lenis?: { on(e: "scroll", cb: () => void): void; off(e: "scroll", cb: () => void): void } };
-    const lenis = (window as WithLenis).__lenis;
-
-    // BOTH sources, not one. Lenis's event is the one that fires in step with the frame it is
-    // drawing, so the outline never lands late during a normal scroll. But it does not emit for
-    // every way the position can change — an immediate `scrollTo`, a hash jump, the browser
-    // restoring a position on a back navigation — and a header stuck in the wrong state after any
-    // of those is worse than one frame of lateness. Both is cheap: it is a boolean, and React
-    // bails out when it has not changed.
-    lenis?.on("scroll", read);
     window.addEventListener("scroll", read, { passive: true });
+    // Read once on mount too: a reload part-way down a page, or a restored back-navigation
+    // position, arrives without ever firing a scroll event.
     read();
-    return () => {
-      lenis?.off("scroll", read);
-      window.removeEventListener("scroll", read);
-    };
+    return () => window.removeEventListener("scroll", read);
   }, []);
 
   // Navigating should close whatever is hanging open, on both breakpoints.
@@ -113,7 +100,7 @@ export function SiteHeader() {
         <div
           className={`mx-auto w-full rounded-full bg-bg-strong p-3 transition-[box-shadow,background-color] duration-300 ease-out ${
             scrolled
-              ? "shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_16px_44px_-22px_rgba(0,43,56,0.95)]"
+              ? "shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_16px_44px_-22px_rgba(0,43,56,0.95)]"
               : "shadow-[0_10px_40px_-20px_rgba(0,43,56,0.8)]"
           }`}
         >

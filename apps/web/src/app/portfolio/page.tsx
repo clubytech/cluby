@@ -64,7 +64,7 @@ export default async function PortfolioPage({
           {portfolio && portfolio.vaults.length > 0 && (
             <Card className="border border-line bg-white">
               <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Deposits</h2>
-              <div data-lenis-prevent className="mt-6 overflow-x-auto">
+              <div className="mt-6 overflow-x-auto">
                 <table className="w-full min-w-[560px] text-left">
                   <thead>
                     <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">

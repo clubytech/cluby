@@ -86,8 +86,8 @@ export function Card({
    *  when clicked is a promise the page does not keep. */
   interactive?: boolean;
 } & Omit<ComponentPropsWithoutRef<"div">, "className" | "children">) {
-  // The rest is forwarded because a Card is still a div: `data-lenis-prevent`, an id an anchor
-  // points at, an aria attribute. A wrapper that swallows them makes the caller reach around it.
+  // The rest is forwarded because a Card is still a div: an id an anchor points at, an aria
+  // attribute, a data hook. A wrapper that swallows them makes every caller reach around it.
   return (
     <div className={`rounded-[28px] bg-bg-weak p-6 md:p-8 ${interactive ? "lift" : ""} ${className}`} {...rest}>
       {children}
