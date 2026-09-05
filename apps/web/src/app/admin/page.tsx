@@ -32,15 +32,22 @@ const decimalsFor = (key: string) => {
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const when = (ts: number) => new Date(ts * 1000).toLocaleString();
 
-/** What each event kind is, in a word an operator reads rather than an event name. */
+/**
+ * What each event kind is, in a word an operator reads rather than an event name.
+ *
+ * Keyed lowercase because the indexer stores the kind lowercase; matching on the event's own
+ * capitalisation silently fell through to the raw string and the table read "borrow" instead of
+ * "Borrowed". Harmless, and exactly the kind of thing that stays wrong forever because it still
+ * technically renders.
+ */
 const KIND: Record<string, { label: string; tone: string }> = {
-  Supply: { label: "Supplied", tone: "text-brand" },
-  Withdraw: { label: "Withdrew", tone: "text-text-soft" },
-  Borrow: { label: "Borrowed", tone: "text-warn" },
-  Repay: { label: "Repaid", tone: "text-brand" },
-  SupplyCollateral: { label: "Posted collateral", tone: "text-brand" },
-  WithdrawCollateral: { label: "Took collateral", tone: "text-text-soft" },
-  Liquidate: { label: "Liquidated", tone: "text-danger" },
+  supply: { label: "Supplied", tone: "text-brand" },
+  withdraw: { label: "Withdrew", tone: "text-text-soft" },
+  borrow: { label: "Borrowed", tone: "text-warn" },
+  repay: { label: "Repaid", tone: "text-brand" },
+  supplycollateral: { label: "Posted collateral", tone: "text-brand" },
+  withdrawcollateral: { label: "Took collateral", tone: "text-text-soft" },
+  liquidate: { label: "Liquidated", tone: "text-danger" },
 };
 
 export default async function AdminPage() {
@@ -174,7 +181,7 @@ export default async function AdminPage() {
                 <tbody>
                   {events.map((e) => {
                     const key = marketName(e.marketId);
-                    const k = KIND[e.kind] ?? { label: e.kind, tone: "text-text-soft" };
+                    const k = KIND[e.kind.toLowerCase()] ?? { label: e.kind, tone: "text-text-soft" };
                     const amount = Number(e.assets) / 10 ** decimalsFor(key);
                     return (
                       <tr key={e.id} className="border-t border-line">
