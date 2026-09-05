@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 export function Button({
   href,
@@ -78,15 +78,18 @@ export function Card({
   children,
   className = "",
   interactive = false,
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   /** Only for a card you can act on. A container that lifts under the cursor and does nothing
    *  when clicked is a promise the page does not keep. */
   interactive?: boolean;
-}) {
+} & Omit<ComponentPropsWithoutRef<"div">, "className" | "children">) {
+  // The rest is forwarded because a Card is still a div: `data-lenis-prevent`, an id an anchor
+  // points at, an aria attribute. A wrapper that swallows them makes the caller reach around it.
   return (
-    <div className={`rounded-[28px] bg-bg-weak p-6 md:p-8 ${interactive ? "lift" : ""} ${className}`}>
+    <div className={`rounded-[28px] bg-bg-weak p-6 md:p-8 ${interactive ? "lift" : ""} ${className}`} {...rest}>
       {children}
     </div>
   );

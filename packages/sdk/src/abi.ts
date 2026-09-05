@@ -132,6 +132,59 @@ export const morphoBlueAbi = [
     ],
     outputs: [],
   },
+  // Authorisation. Missing until now, which broke Multiply in both directions at once: the read
+  // silently failed so the panel always believed you were unauthorised, and the button it then
+  // offered could not encode its own call. A gap in an ABI does not fail loudly anywhere.
+  {
+    type: "function",
+    name: "setAuthorization",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "authorized", type: "address" },
+      { name: "newIsAuthorized", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "isAuthorized",
+    stateMutability: "view",
+    inputs: [
+      { name: "authorizer", type: "address" },
+      { name: "authorized", type: "address" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "accrueInterest",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "marketParams",
+        type: "tuple",
+        components: [
+          { name: "loanToken", type: "address" },
+          { name: "collateralToken", type: "address" },
+          { name: "oracle", type: "address" },
+          { name: "irm", type: "address" },
+          { name: "lltv", type: "uint256" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "flashLoan",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "assets", type: "uint256" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [],
+  },
 ] as const;
 
 export const irmAbi = [
@@ -261,4 +314,32 @@ export const vaultAbi = [
   { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "name", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  // `redeem` takes a SHARE count, and that is the difference between closing a position and almost
+  // closing it: shares are exact at any timestamp, while an asset amount quoted in one block is
+  // short in the next and leaves dust behind. Anything meaning "all of it" must go through here.
+  {
+    type: "function",
+    name: "redeem",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "shares", type: "uint256" },
+      { name: "receiver", type: "address" },
+      { name: "owner", type: "address" },
+    ],
+    outputs: [{ name: "assets", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "maxRedeem",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "convertToShares",
+    stateMutability: "view",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
 ] as const;

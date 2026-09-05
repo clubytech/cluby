@@ -6,6 +6,7 @@ import { PositionPanel } from "@/components/position-panel";
 import { SeriesChart } from "@/components/series-chart";
 import { getMarketSeries, getWaitingDemand } from "@/lib/series";
 import { RateCurve } from "@/components/rate-curve";
+import { MarketLogo } from "@/components/market-logo";
 
 export const revalidate = 30;
 
@@ -43,6 +44,9 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
       <section className="bg-bg-strong text-white">
         <div className="container-padding pb-14 pt-10">
           <div className="flex flex-wrap items-center gap-4">
+            <span className="group inline-flex">
+              <MarketLogo subject={market.subject} size={56} />
+            </span>
             <h1 className="font-[family-name:var(--font-ibm-plex-serif)] text-[36px] md:text-[48px]">
               {isShort ? `Short ${market.subject}` : `${market.collateralSymbol} / ${market.loanSymbol}`}
             </h1>

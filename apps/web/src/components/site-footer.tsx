@@ -60,7 +60,12 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col gap-3 border-t border-line-dark pt-6 text-xs text-text-faint sm:flex-row sm:items-center sm:justify-between">
-          <p>Cluby runs on Robinhood Chain (4663). Markets are immutable once created.</p>
+          <p className="flex flex-wrap items-center gap-2">
+            <span className="num rounded-full border border-line-dark px-2.5 py-1 text-[10px] uppercase tracking-widest text-text-faint">
+              Robinhood Chain · 4663
+            </span>
+            Markets are immutable once created.
+          </p>
           <p className="num">Not investment advice. Positions can be liquidated.</p>
         </div>
       </div>

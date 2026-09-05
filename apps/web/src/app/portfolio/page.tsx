@@ -4,6 +4,7 @@ import { getPortfolio } from "@/lib/portfolio";
 import { getPoints } from "@/lib/series";
 import { pct, usd } from "@/lib/format";
 import { AddressForm } from "@/components/address-form";
+import { MarketLogo } from "@/components/market-logo";
 
 export const metadata = { title: "Portfolio — Cluby" };
 export const revalidate = 30;
@@ -63,7 +64,7 @@ export default async function PortfolioPage({
           {portfolio && portfolio.vaults.length > 0 && (
             <Card className="border border-line bg-white">
               <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Deposits</h2>
-              <div className="mt-6 overflow-x-auto">
+              <div data-lenis-prevent className="mt-6 overflow-x-auto">
                 <table className="w-full min-w-[560px] text-left">
                   <thead>
                     <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">
@@ -96,9 +97,7 @@ export default async function PortfolioPage({
                   <div key={p.market} className="rounded-2xl border border-line p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <span className="num flex h-9 w-9 items-center justify-center rounded-full bg-bg-strong text-[11px] text-white">
-                          {p.subject.slice(0, 4)}
-                        </span>
+                        <MarketLogo subject={p.subject} />
                         <p className="text-sm font-medium">{p.market}</p>
                       </div>
                       {p.debtUsd > 0 &&

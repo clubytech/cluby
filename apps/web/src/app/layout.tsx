@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, IBM_Plex_Serif, IBM_Plex_Mono } from "next/font/google";
+import { SmoothScroll } from "@/components/smooth-scroll";
 import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${inter.variable} ${serif.variable} ${mono.variable} antialiased`}
         style={{ background: "#ffffff" }}
       >
+        <SmoothScroll />
         <Providers>
           <SiteHeader />
           <main>{children}</main>

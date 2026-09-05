@@ -89,16 +89,20 @@ export function HeroField() {
         const ring = -0.28 * Math.exp(-((Math.abs(d) - SIGMA * 1.9) ** 2) / (2 * 2.2 * 2.2));
         const want = (g + ring) * strength;
 
-        const next = current[i]! + (want - current[i]!) * 0.22;
-        if (Math.abs(next - current[i]!) > 0.0005) moved = true;
+        const prev = current[i]!;
+        const next = prev + (want - prev) * 0.22;
         current[i] = next;
 
-        const v = next;
-        nodes[i]!.style.setProperty("--duck", v.toFixed(4));
-        // Lean away from the cursor: the sign follows which side the column is on, and the size
-        // follows the same falloff, so the field parts rather than sliding.
+        // A change too small to see is a style recalculation for nothing, and there are 56 of these
+        // every frame. Three decimals is finer than a pixel at this scale.
+        if (Math.abs(next - prev) < 0.001) continue;
+        moved = true;
+
         const lean = d === 0 ? 0 : Math.sign(d) * g * strength * 7;
-        nodes[i]!.style.setProperty("--lean", `${lean.toFixed(2)}px`);
+        // One write, not two: the transform is set directly rather than through two custom
+        // properties the engine then has to resolve.
+        nodes[i]!.style.transform = `translate3d(${lean.toFixed(1)}px, ${(next * 96).toFixed(1)}%, 0)`;
+        nodes[i]!.style.setProperty("--duck", next.toFixed(3));
       }
 
       settled = !moved && Math.abs(targetStrength - strength) < 0.001;
@@ -223,18 +227,21 @@ const css = `
    them on separate elements is what lets both run at once without one overwriting the other. */
 .hero-bar {
   --duck: 0;
-  --lean: 0px;
   flex: 1 1 0;
   height: var(--h);
-  transform: translate3d(var(--lean), calc(var(--duck) * 96%), 0);
+  /* transform is written directly by the wave; this is only the resting state. */
+  transform: translate3d(0, 0, 0);
   will-change: transform;
 }
 
 .hero-bar-fill {
   display: block;
   height: 100%;
-  border-radius: 2px 2px 0 0;
+  border-radius: 3px 3px 0 0;
   transform-origin: bottom;
+  /* The top of a column is where it stops existing, not where it gets cut off. */
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, #000 55%, transparent 100%);
   /* Brighter than a wash: a hot cyan foot that carries most of the light, cooling as it rises. */
   background: linear-gradient(
     to top,
@@ -242,7 +249,11 @@ const css = `
     rgb(64 200 220 / calc(var(--tint) + 0.34)) 30%,
     rgb(64 176 192 / calc(var(--tint) * 0.36)) 100%
   );
-  box-shadow: 0 0 calc(18px + var(--duck) * -10px) rgb(90 210 230 / calc(var(--tint) * 0.75 - var(--duck) * 0.35));
+  /* No animated box-shadow here, deliberately. Driving a blur radius from a custom property
+     repaints a blurred region per element per frame -- 56 of them -- and the cost compounds until
+     the whole page stutters. The glow is a separate, static layer below; only its opacity moves,
+     and opacity composites. */
+  box-shadow: 0 0 16px rgb(90 210 230 / calc(var(--tint) * 0.5));
   animation:
     hero-rise 1.1s cubic-bezier(0.16, 1, 0.3, 1) var(--delay) backwards,
     hero-breathe var(--breathe) ease-in-out calc(var(--delay) + 1.1s) infinite;

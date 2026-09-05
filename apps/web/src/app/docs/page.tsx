@@ -56,7 +56,10 @@ const sections: [string, string][] = [
   ["points", "Points"],
   ["builders", "Builders"],
   ["flash-loans", "Flash loans"],
-  ["mcp", "MCP and API"],
+  ["mcp", "API and MCP"],
+  ["fees", "Fees and what they pay for"],
+  ["liquidity", "Being first into a market"],
+  ["failure", "What breaks, and what happens then"],
   ["security", "Security"],
   ["addresses", "Addresses"],
   ["glossary", "Glossary"],
@@ -81,7 +84,10 @@ export default async function DocsPage() {
 
       <section className="bg-white">
         <div className="container-padding section-y flex flex-col gap-10 lg:flex-row">
-          <nav className="lg:sticky lg:top-32 lg:h-fit lg:max-h-[calc(100vh-10rem)] lg:w-56 lg:shrink-0 lg:overflow-y-auto">
+          <nav
+            data-lenis-prevent
+            className="lg:sticky lg:top-32 lg:h-fit lg:max-h-[calc(100vh-10rem)] lg:w-56 lg:shrink-0 lg:overflow-y-auto"
+          >
             <p className="text-[11px] uppercase tracking-widest text-text-soft">On this page</p>
             <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 lg:flex-col lg:gap-1">
               {sections.map(([id, label]) => (
@@ -441,15 +447,177 @@ export default async function DocsPage() {
               </p>
             </Doc>
 
-            <Doc id="mcp" title="MCP and API">
+            <Doc id="mcp" title="API and MCP">
               <p>
-                The SDK that the site runs on is published as a package and exposed over MCP, so an
-                agent can read markets and positions and build a transaction without driving a browser.
-                Public endpoints: <code className="num">/api/markets</code>,{" "}
-                <code className="num">/api/vaults</code>, <code className="num">/api/stats</code>.
+                The site has no private data path. Every number on it comes from three public read
+                endpoints, and they are the same ones you can use — not a subset, not a mirror, the
+                identical call. If a figure here is wrong, the API is wrong the same way, which is
+                the only version of a public API worth having.
+              </p>
+
+              <div className="not-prose flex flex-col gap-4">
+                <Endpoint
+                  path="/api/markets"
+                  what="Every market in the catalogue, listed or not, with its live state."
+                  fields={[
+                    ["key, subject, side", "which market, and whether it is a long or a short"],
+                    ["collateralAddress, marketId", "what to call on chain"],
+                    ["lltv, safeLtv, maxLeverage", "the liquidation threshold, the cap the UI enforces, and what that allows"],
+                    ["oracle, feed, price, priceAge, priceStale", "the price and how old it is, in seconds"],
+                    ["totalSupplyUsd, totalBorrowUsd, liquidityUsd, utilization", "the pool, right now"],
+                    ["borrowApr, supplyApr", "rates, already compounded to a year"],
+                    ["status", "listed, planned or blocked — and `note` says why when it is blocked"],
+                  ]}
+                />
+                <Endpoint
+                  path="/api/vaults"
+                  what="The curated vaults, their caps, and what can be withdrawn this second."
+                  fields={[
+                    ["address, asset, symbol", "the ERC-4626 and what it holds"],
+                    ["totalAssetsUsd, withdrawableUsd", "supplied, and the part not currently borrowed"],
+                    ["apy, performanceFee, introFeeDays", "what a depositor earns and what is taken"],
+                    ["timelockSeconds", "how long a cap increase has to wait"],
+                    ["caps", "per market: the cap and whether it is enabled"],
+                  ]}
+                />
+                <Endpoint
+                  path="/api/stats"
+                  what="The protocol in one object, plus the addresses behind it."
+                  fields={[
+                    ["totalSupplyUsd, totalBorrowUsd, liquidityUsd, utilization", "across every market"],
+                    ["marketCount, listedCount, plannedCount, blockedCount", "the catalogue, counted"],
+                    ["longCount, shortCount, shortInterestUsd", "the split between the two sides"],
+                    ["feedsAnswering", "how many oracles answered on this read — a health check"],
+                    ["lltvTiers, economics", "the risk tiers and the fee split, as configured"],
+                    ["contracts", "every deployed address"],
+                  ]}
+                />
+              </div>
+
+              <p>
+                <span className="text-text-strong">Conventions.</span> Money is a NUMBER in whole
+                units, already scaled — <code className="num">totalSupplyUsd: 1250.5</code> means
+                $1,250.50, not wei. Rates and ratios are fractions, so{" "}
+                <code className="num">0.0625</code> is 6.25%. Addresses are checksummed. A field that
+                could not be read is <code className="num">null</code> rather than zero, because a
+                missing number and a zero are different facts and confusing them is how a dashboard
+                lies. Every response carries <code className="num">updatedAt</code> as a millisecond
+                timestamp.
+              </p>
+              <p>
+                <span className="text-text-strong">Caching.</span> Responses are revalidated every 30
+                seconds. There is no key, no rate limit and no CORS restriction; if you need it more
+                often than that, read the chain directly — the addresses are below and the SDK does
+                exactly that.
+              </p>
+              <p>
+                <span className="text-text-strong">Stability.</span> Fields will be ADDED without
+                warning. Nothing currently there will be removed or change meaning without a
+                versioned path appearing first. Read defensively anyway: treat an unknown field as
+                harmless and never index a response by position.
+              </p>
+
+              <p>
+                <span className="text-text-strong">The SDK and MCP.</span> The package the site runs
+                on is the same code these endpoints call — market ids, the share and asset
+                arithmetic Morpho uses, health factors and liquidation prices, and transaction
+                builders. It is exposed over MCP as well, so an agent can read a position and build
+                a transaction without driving a browser. Anything the site can compute, it can
+                compute, because there is only one implementation of each of those things.
               </p>
             </Doc>
 
+
+
+            <Doc id="fees" title="Fees and what they pay for">
+              <p>
+                One fee, on one thing: {pct(e.performanceFee, 0)} of the INTEREST a vault earns.
+                Nothing is charged on a deposit, a withdrawal, a borrow, a repayment or a
+                liquidation, and there is no flash-loan fee. If the vault earns nothing, we are paid
+                nothing.
+              </p>
+              <p>
+                It is {pct(e.introFee, 0)} for the first {e.introDays} days of a vault. A curator with
+                no track record charging a full fee is asking to be paid for a service nobody has
+                watched work yet.
+              </p>
+              <p>
+                Of what is collected, {pct(stats.economics.feeSplit.stakers, 0)} goes to stakers and{" "}
+                {pct(stats.economics.feeSplit.treasury, 0)} to the treasury — audits, oracle coverage,
+                keeper gas, and the first liquidity that makes a new market usable. Borrowers get{" "}
+                {pct(e.borrowRebate, 0)} of the interest they paid back through a weekly epoch, and a
+                builder who referred the volume gets {pct(e.builderShare, 0)} of the fee on it.
+              </p>
+              <p>
+                What Morpho charges is separate and currently zero on these markets. If its
+                governance ever turns its own fee on, it comes out of the same interest, and this
+                page will say so rather than quietly absorbing it.
+              </p>
+            </Doc>
+
+            <Doc id="liquidity" title="Being first into a market">
+              <p>
+                A new market is empty, and both sides are waiting for the other. Three things exist
+                so that waiting is not dead time.
+              </p>
+              <p>
+                <span className="text-text-strong">Collateral needs no liquidity.</span>{" "}
+                <code className="num">supplyCollateral</code> does not touch the lending pool, so a
+                borrower can be in position before there is anything to borrow, owe nothing while
+                they wait, and take it back whenever they like. When a lender arrives, borrowing is
+                one transaction with no approval and no queue.
+              </p>
+              <p>
+                <span className="text-text-strong">The demand is visible.</span> Earn shows the value
+                of collateral posted by accounts carrying no debt — people who have already paid gas
+                to stand in the market. That is a better signal to a lender than a TVL number,
+                because it cost something.
+              </p>
+              <p>
+                <span className="text-text-strong">The exit is not locked.</span> Earn leads with
+                what is withdrawable this second against what is supplied, read off the vault. There
+                is no lock, no notice period and no epoch; only utilisation can hold a withdrawal,
+                and the rate climbs steeply as the pool empties, which is what pulls borrowers into
+                repaying.
+              </p>
+            </Doc>
+
+            <Doc id="failure" title="What breaks, and what happens then">
+              <p>
+                Every system has failure modes. These are ours, and what each one costs.
+              </p>
+              <p>
+                <span className="text-text-strong">The keeper stops.</span> Liquidations get slower,
+                not impossible: Morpho's liquidation is open to anyone and the premium is the
+                incentive. The keeper exists because a new chain may have nobody watching yet, not
+                because it is the only path.
+              </p>
+              <p>
+                <span className="text-text-strong">A feed goes stale.</span> Stock feeds legitimately
+                go quiet over a weekend, so the staleness limit is five days for a stock and one for
+                crypto. Past that the market page marks the price stale and the watchdog alerts. A
+                feed that stops entirely makes its market unborrowable rather than mispriced —
+                reverting is the safe answer and it is the one Morpho gives.
+              </p>
+              <p>
+                <span className="text-text-strong">A pool moves away from the oracle.</span> The
+                liquidator refuses to sell more than a set distance below the oracle price, so a
+                pushed pool reverts the liquidation instead of handing the difference to whoever
+                pushed it. The cost is a liquidation that waits; the alternative is one that pays an
+                attacker.
+              </p>
+              <p>
+                <span className="text-text-strong">The site or the indexer goes down.</span> Neither
+                holds anything. Every position can be managed by calling Morpho directly, and the
+                addresses are listed below so that is a real option rather than a slogan.
+              </p>
+              <p>
+                <span className="text-text-strong">We disappear.</span> The markets stay. They are
+                immutable, the collateral is in Morpho, liquidation is permissionless, and
+                withdrawal needs nobody's permission. The worst case is that nobody curates any more
+                — no new markets, no cap changes — not that anything is trapped.
+              </p>
+            </Doc>
 
             <Doc id="security" title="Security">
               <p>
@@ -591,10 +759,58 @@ export default async function DocsPage() {
   );
 }
 
-function Doc({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+/** One endpoint, its purpose, and what comes back — laid out so it can be scanned. */
+function Endpoint({
+  path,
+  what,
+  fields,
+}: {
+  path: string;
+  what: string;
+  fields: [string, string][];
+}) {
+  return (
+    <div className="rounded-2xl border border-line bg-white p-5">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <code className="num rounded-lg bg-bg-weak px-2.5 py-1 text-[13px] text-text-strong">GET {path}</code>
+        <span className="num text-[10px] uppercase tracking-widest text-up">live</span>
+      </div>
+      <p className="mt-3 text-sm text-text-soft">{what}</p>
+      <dl className="mt-4 flex flex-col gap-2">
+        {fields.map(([k, v]) => (
+          <div key={k} className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+            <dt className="num w-full shrink-0 text-xs text-text-strong sm:w-72">{k}</dt>
+            <dd className="text-xs text-text-soft">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function Doc({
+  id,
+  title,
+  badge,
+  children,
+}: {
+  id: string;
+  title: string;
+  /** For a section describing something that is not finished, said at the heading rather than
+   *  buried in the third sentence. */
+  badge?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section id={id} className="scroll-mt-32">
-      <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px]">{title}</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px]">{title}</h2>
+        {badge && (
+          <span className="num rounded-full bg-brand-bright/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-brand">
+            {badge}
+          </span>
+        )}
+      </div>
       <div className="mt-4 flex flex-col gap-4 text-sm leading-relaxed text-text-soft">{children}</div>
     </section>
   );

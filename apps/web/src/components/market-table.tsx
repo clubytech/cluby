@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { MarketView } from "@/lib/markets";
 import { pct, usd } from "@/lib/format";
 import { Badge } from "./ui";
+import { MarketLogo } from "./market-logo";
 
 const statusTone = { listed: "live", planned: "pending", blocked: "neutral" } as const;
 const statusLabel = { listed: "Live", planned: "Listing", blocked: "Blocked" } as const;
@@ -62,7 +63,7 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-[28px] border border-line bg-white">
+      <div data-lenis-prevent className="overflow-x-auto rounded-[28px] border border-line bg-white">
         <table className="w-full min-w-[900px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-widest text-text-soft">
@@ -84,9 +85,7 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
               >
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-3">
-                    <span className="num flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-strong text-[11px] text-white transition-all duration-250 ease-out group-hover:scale-110 group-hover:bg-brand">
-                      {m.subject.slice(0, 4)}
-                    </span>
+                    <MarketLogo subject={m.subject} />
                     <div>
                       <p className="text-sm font-medium text-text-strong">
                         {m.side === "long" ? `${m.collateralSymbol} / ${m.loanSymbol}` : `Short ${m.subject}`}

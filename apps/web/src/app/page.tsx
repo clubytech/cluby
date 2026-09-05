@@ -3,6 +3,7 @@ import { usd, pct } from "@/lib/format";
 import { Button, Card, SectionHeading, Stat } from "@/components/ui";
 import { MarketTable } from "@/components/market-table";
 import { HeroField } from "@/components/hero-field";
+import { IconScale, IconSwap, IconVault } from "@/components/icons";
 
 export const revalidate = 30;
 
@@ -59,24 +60,27 @@ export default async function Home() {
             lead="Cluby curates isolated markets on Morpho Blue. Deposits earn from borrowers, borrowers keep their exposure, and every position is priced by the same Chainlink feed the market makers use."
           />
           <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
-            <Card>
-              <p className="num text-[11px] uppercase tracking-widest text-text-soft">01 — Supply</p>
+            <Card interactive className="shine group border border-line bg-white">
+              <IconVault />
+              <p className="num mt-5 text-[11px] uppercase tracking-widest text-text-soft">01 — Supply</p>
               <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Lend USDG</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Deposit into the Core vault. It spreads liquidity across the four markets under caps
                 you can read on chain, and you withdraw whatever is not currently borrowed.
               </p>
             </Card>
-            <Card>
-              <p className="num text-[11px] uppercase tracking-widest text-text-soft">02 — Collateralise</p>
+            <Card interactive className="shine group border border-line bg-white">
+              <IconScale />
+              <p className="num mt-5 text-[11px] uppercase tracking-widest text-text-soft">02 — Collateralise</p>
               <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Post your shares</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Tokenized NVDA, SPY, AAPL and ETH are accepted. Collateral never leaves Morpho Blue —
                 Cluby has no contract that can hold it between transactions.
               </p>
             </Card>
-            <Card>
-              <p className="num text-[11px] uppercase tracking-widest text-text-soft">03 — Borrow</p>
+            <Card interactive className="shine group border border-line bg-white">
+              <IconSwap />
+              <p className="num mt-5 text-[11px] uppercase tracking-widest text-text-soft">03 — Borrow</p>
               <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Take USDG out</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Up to {pct(0.575, 1)} of collateral value on stock markets, with the liquidation price
