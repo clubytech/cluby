@@ -93,3 +93,62 @@ export async function getMarketSeries(marketKey: string, sinceUnix = 0): Promise
     return null;
   }
 }
+
+export type WaitingRow = { marketId: `0x${string}`; collateral: bigint; accounts: number };
+
+/**
+ * Collateral already posted by accounts that have not borrowed yet — demand standing at the door.
+ *
+ * This is the number that makes an empty pool legible: a supplier can see that borrowers are
+ * already collateralised and waiting, rather than guessing whether anyone will show up.
+ */
+export async function getWaitingDemand(): Promise<WaitingRow[] | null> {
+  if (!INDEXER) return null;
+  try {
+    const r = await fetch(`${INDEXER}/waiting-demand`, { next: { revalidate: 30 } });
+    if (!r.ok) return null;
+    const rows = (await r.json()) as { marketId: string; collateral: string; accounts: number }[];
+    return rows.map((row) => ({
+      marketId: row.marketId as `0x${string}`,
+      collateral: BigInt(row.collateral),
+      accounts: row.accounts,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export type ReceiptRow = {
+  id: string;
+  marketId: `0x${string}`;
+  kind: string;
+  user: `0x${string}`;
+  assets: bigint;
+  shares: bigint;
+  txHash: `0x${string}`;
+  blockNumber: number;
+  timestamp: number;
+};
+
+/** Every supply, borrow, repay and withdraw the indexer has seen, newest first. */
+export async function getReceipts(limit = 100): Promise<ReceiptRow[] | null> {
+  if (!INDEXER) return null;
+  try {
+    const r = await fetch(`${INDEXER}/events?limit=${limit}`, { next: { revalidate: 15 } });
+    if (!r.ok) return null;
+    const rows = (await r.json()) as Record<string, string>[];
+    return rows.map((row) => ({
+      id: row.id!,
+      marketId: row.marketId as `0x${string}`,
+      kind: row.kind!,
+      user: row.user as `0x${string}`,
+      assets: BigInt(row.assets ?? "0"),
+      shares: BigInt(row.shares ?? "0"),
+      txHash: row.txHash as `0x${string}`,
+      blockNumber: Number(row.blockNumber ?? 0),
+      timestamp: Number(row.timestamp ?? 0),
+    }));
+  } catch {
+    return null;
+  }
+}

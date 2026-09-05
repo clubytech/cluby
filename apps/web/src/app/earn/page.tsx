@@ -1,4 +1,5 @@
-import { getVaults } from "@/lib/markets";
+import { getMarkets, getVaults } from "@/lib/markets";
+import { getWaitingDemand } from "@/lib/series";
 import { pct, usd } from "@/lib/format";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { VaultPanel } from "@/components/vault-panel";
@@ -16,7 +17,21 @@ const kindLabel: Record<string, string> = {
 };
 
 export default async function EarnPage() {
-  const vaults = await getVaults();
+  const [vaults, markets, waiting] = await Promise.all([getVaults(), getMarkets(), getWaitingDemand()]);
+
+  // Collateral already posted by accounts carrying no debt: borrowers who are standing in the market
+  // waiting for something to borrow. It is the honest answer to "will anyone use my deposit".
+  const waitingByKey = (waiting ?? []).flatMap((w) => {
+    const m = markets.find((x) => x.marketId?.toLowerCase() === w.marketId.toLowerCase());
+    if (!m || m.price === null) return [];
+    const decimals = m.collateralSymbol === "USDG" ? 6 : 18;
+    const usdValue = (Number(w.collateral) / 10 ** decimals) * (m.side === "short" ? 1 : m.price);
+    return [{ key: m.key, usd: usdValue, accounts: w.accounts }];
+  });
+  const waitingUsd = waitingByKey.reduce((a, b) => a + b.usd, 0);
+  const waitingAccounts = waitingByKey.reduce((a, b) => a + b.accounts, 0);
+  const totalWithdrawable = vaults.reduce((a, v) => a + v.withdrawableUsd, 0);
+  const totalAssets = vaults.reduce((a, v) => a + v.totalAssetsUsd, 0);
 
   return (
     <>
@@ -33,6 +48,55 @@ export default async function EarnPage() {
 
       <section className="bg-bg-weak/60">
         <div className="container-padding section-y flex flex-col gap-6">
+          {/* The two questions a first depositor actually has: can I get out, and is anyone waiting
+              to borrow this. Both are answered from live state rather than from a promise. */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card className="border border-line bg-white">
+              <div className="flex items-center gap-3">
+                <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">The exit is not locked</h3>
+                <Badge tone="live">No lockup</Badge>
+              </div>
+              <p className="num mt-4 text-3xl">{usd(totalWithdrawable)}</p>
+              <p className="mt-1 text-sm text-text-soft">
+                withdrawable this second, out of {usd(totalAssets)} supplied
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-text-soft">
+                There is no lock, no notice period and no epoch. What limits a withdrawal is only how
+                much of the pool is borrowed at that moment — the rest is yours on demand, and the
+                rate climbs steeply as the pool empties, which is what pulls borrowers into repaying.
+                Everything above is read from the vault, not from a policy we wrote down.
+              </p>
+            </Card>
+
+            <Card className="border border-line bg-white">
+              <div className="flex items-center gap-3">
+                <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Demand already at the door</h3>
+                {waiting === null && <Badge>Indexer offline</Badge>}
+              </div>
+              <p className="num mt-4 text-3xl">{waiting === null ? "—" : usd(waitingUsd)}</p>
+              <p className="mt-1 text-sm text-text-soft">
+                {waiting === null
+                  ? "unavailable right now"
+                  : `${waitingAccounts} account${waitingAccounts === 1 ? "" : "s"} holding collateral with nothing borrowed against it`}
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-text-soft">
+                A borrower does not have to wait for liquidity to arrive before acting. Posting
+                collateral needs no liquidity at all, so they can be in position first and borrow in
+                the same second the money appears. That is what this number is: demand that has
+                already paid the cost of showing up.
+              </p>
+              {waitingByKey.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {waitingByKey.map((w) => (
+                    <span key={w.key} className="num rounded-full border border-line px-3 py-1 text-xs text-text-soft">
+                      {w.key} · {usd(w.usd)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
           {vaults.map((v) => (
             <Card key={v.key} className="border border-line bg-white">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">

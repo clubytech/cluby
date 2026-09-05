@@ -12,6 +12,7 @@ const nav: { href: string; label: string; soon?: boolean }[] = [
   { href: "/stake", label: "Stake" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/stats", label: "Stats" },
+  { href: "/activity", label: "Activity" },
   { href: "/docs", label: "Docs" },
   { href: "/builders", label: "Builders" },
   { href: "/launchpad", label: "Launchpad", soon: true },

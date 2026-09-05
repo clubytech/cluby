@@ -146,6 +146,44 @@ app.get("/points", async (c) => {
   );
 });
 
+/**
+ * Everything that happened, newest first — the receipts a first user checks instead of believing a
+ * claim. Small protocols are read this way: not "what is the TVL" but "does anything actually
+ * happen here, and did people get their money back".
+ */
+app.get("/events", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") ?? 100), 500);
+  const rows = await db
+    .select()
+    .from(schema.txEvent)
+    .orderBy(desc(schema.txEvent.timestamp))
+    .limit(limit);
+  return reply(c, rows);
+});
+
+/**
+ * Collateral sitting in a market with nothing borrowed against it.
+ *
+ * Posting collateral needs no liquidity, so a borrower can take the position before a lender exists
+ * and draw the loan the moment one does. That waiting collateral is the only honest measure of
+ * demand a protocol has before it has volume — somebody locked their shares for it.
+ */
+app.get("/waiting-demand", async (c) => {
+  const positions = await db.select().from(schema.position);
+  const byMarket = new Map<string, { collateral: bigint; accounts: number }>();
+  for (const p of positions) {
+    if (p.collateral === 0n || p.borrowShares > 0n) continue;
+    const cur = byMarket.get(p.marketId) ?? { collateral: 0n, accounts: 0 };
+    cur.collateral += p.collateral;
+    cur.accounts += 1;
+    byMarket.set(p.marketId, cur);
+  }
+  return reply(
+    c,
+    [...byMarket].map(([marketId, v]) => ({ marketId, collateral: v.collateral, accounts: v.accounts })),
+  );
+});
+
 app.get("/stats", async (c) => {
   const [markets, vaults, liquidations] = await Promise.all([
     db.select().from(schema.market),

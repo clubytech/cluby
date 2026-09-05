@@ -4,7 +4,8 @@ import { age, pct, usd } from "@/lib/format";
 import { Badge, Card } from "@/components/ui";
 import { PositionPanel } from "@/components/position-panel";
 import { SeriesChart } from "@/components/series-chart";
-import { getMarketSeries } from "@/lib/series";
+import { getMarketSeries, getWaitingDemand } from "@/lib/series";
+import { RateCurve } from "@/components/rate-curve";
 
 export const revalidate = 30;
 
@@ -19,7 +20,13 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
   const market = markets.find((m) => m.key.toLowerCase() === key.toLowerCase());
   if (!market) notFound();
 
-  const series = market.status === "listed" ? await getMarketSeries(market.key) : null;
+  const [series, waiting] = await Promise.all([
+    market.status === "listed" ? getMarketSeries(market.key) : null,
+    market.status === "listed" ? getWaitingDemand() : null,
+  ]);
+
+  // Collateral sitting in this market with no debt against it — people already in position.
+  const queued = waiting?.find((w) => w.marketId.toLowerCase() === market.marketId?.toLowerCase()) ?? null;
 
   const isShort = market.side === "short";
   const oracleLabel =
@@ -94,6 +101,33 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
                   accent="var(--color-brand-bright)"
                 />
               </div>
+            )}
+
+            {market.status === "listed" && market.borrowApr !== null && (
+              <RateCurve borrowApy={market.borrowApr} utilization={market.utilization} />
+            )}
+
+            {market.status === "listed" && (
+              <Card className="bg-bg-weak">
+                <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">
+                  You can take your place before the money arrives
+                </h2>
+                <p className="mt-4 text-sm leading-relaxed text-text-soft">
+                  Posting collateral does not touch the lending pool, so it works whether there is{" "}
+                  {usd(market.liquidityUsd)} available or nothing at all. Move the LTV slider to zero
+                  and the button becomes <span className="text-text-strong">Post collateral</span>: your{" "}
+                  {market.collateralSymbol} goes in, no debt is created, and you owe nothing and pay
+                  nothing while you wait. The moment a supplier funds this market you borrow in a single
+                  transaction, with no approval, no queue and no allowance to set up again. Withdrawing
+                  collateral you never borrowed against is equally unconditional — you are not committing
+                  to anything by standing in line.
+                </p>
+                {queued && (
+                  <p className="num mt-4 text-sm text-text-strong">
+                    {queued.accounts} account{queued.accounts === 1 ? "" : "s"} already waiting here.
+                  </p>
+                )}
+              </Card>
             )}
 
             <Card className="bg-bg-weak">

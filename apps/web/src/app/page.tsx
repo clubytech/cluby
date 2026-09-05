@@ -1,8 +1,8 @@
-import Image from "next/image";
 import { getMarkets, getProtocolStats } from "@/lib/markets";
 import { usd, pct } from "@/lib/format";
 import { Button, Card, SectionHeading, Stat } from "@/components/ui";
 import { MarketTable } from "@/components/market-table";
+import { HeroField } from "@/components/hero-field";
 
 export const revalidate = 30;
 
@@ -15,22 +15,7 @@ export default async function Home() {
     <>
       {/* Hero */}
       <section className="relative -mt-[108px] flex min-h-screen max-h-[calc(880px+108px)] flex-col pt-[108px]">
-        <div className="absolute inset-0 -z-10 overflow-hidden bg-bg-deep">
-          {/* The coin row sits as a band at the foot of the hero, the way the reference layout
-              carries its photography — full-bleed it swallows the headline. */}
-          <div className="absolute inset-x-0 bottom-0 h-[46%]">
-            <Image
-              src="/cluby-banner.png"
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-center scale-[1.02] blur-[1.5px]"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-bg-deep via-bg-deep/60 to-bg-deep/90" />
-          </div>
-          <div className="absolute inset-x-0 top-0 h-[56%] bg-bg-deep" />
-        </div>
+        <HeroField />
 
         <div className="relative flex flex-1 flex-col items-center justify-center px-4 text-center">
           <p className="num mb-6 rounded-full border border-white/20 px-4 py-1.5 text-[11px] uppercase tracking-widest text-white/80">
