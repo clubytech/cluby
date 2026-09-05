@@ -35,7 +35,7 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
                   setSide(s);
                   setCategory("All");
                 }}
-                className={`rounded-full px-5 py-2 text-sm capitalize transition-colors ${
+                className={`press rounded-full px-5 py-2 text-sm capitalize transition-all duration-200 ${
                   side === s ? "bg-bg-strong text-white" : "text-text-soft hover:text-text-strong"
                 }`}
               >
@@ -49,7 +49,7 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
                 key={c}
                 type="button"
                 onClick={() => setCategory(c)}
-                className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
+                className={`press rounded-full border px-4 py-1.5 text-xs transition-all duration-200 ${
                   category === c
                     ? "border-brand bg-brand/10 text-brand"
                     : "border-line text-text-soft hover:border-text-soft"
@@ -78,10 +78,13 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
           </thead>
           <tbody>
             {rows.map((m) => (
-              <tr key={m.key} className="border-b border-line/70 last:border-0 hover:bg-bg-weak/60">
+              <tr
+                key={m.key}
+                className="group border-b border-line/70 transition-colors duration-200 last:border-0 hover:bg-bg-weak/60"
+              >
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-3">
-                    <span className="num flex h-9 w-9 items-center justify-center rounded-full bg-bg-strong text-[11px] text-white">
+                    <span className="num flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-strong text-[11px] text-white transition-all duration-250 ease-out group-hover:scale-110 group-hover:bg-brand">
                       {m.subject.slice(0, 4)}
                     </span>
                     <div>
@@ -109,10 +112,10 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
                   ) : (
                     <Link
                       href={`/borrow/${m.key.toLowerCase()}`}
-                      className={`rounded-full px-4 py-2 text-xs font-medium ${
+                      className={`press inline-block rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
                         m.status === "listed"
-                          ? "bg-bg-strong text-white hover:bg-bg-mid"
-                          : "border border-line text-text-soft hover:border-text-soft"
+                          ? "bg-bg-strong text-white group-hover:bg-brand group-hover:shadow-[0_10px_24px_-14px_rgba(0,120,140,0.9)]"
+                          : "border border-line text-text-soft group-hover:border-text-soft group-hover:text-text-strong"
                       }`}
                     >
                       {m.status === "listed" ? (m.side === "long" ? "Borrow" : "Short") : "Details"}

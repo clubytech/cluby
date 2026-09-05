@@ -24,7 +24,6 @@ export const metadata: Metadata = {
   title: "Cluby — credit against tokenized stocks",
   description:
     "Borrow USDG against tokenized NVDA, SPY, AAPL and ETH. Isolated markets curated on Morpho Blue, on Robinhood Chain.",
-  icons: { icon: "/cluby-logo.png" },
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",

@@ -321,6 +321,8 @@ export async function getProtocolStats() {
       borrowRebate: economics.borrowRebate,
       builderShare: economics.builderShare,
       flashLoanFee: economics.flashLoanFee,
+      feeSplit: economics.feeSplit,
+      creatorFeeToStakers: economics.tokenCreatorFeeToStakers,
     },
     contracts: {
       morphoBlue: morpho.blue.address,
