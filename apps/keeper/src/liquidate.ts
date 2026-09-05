@@ -5,7 +5,7 @@ import { marketCatalog } from "@cluby/config";
 import { getMarketParams } from "@cluby/sdk";
 import { alert } from "./alerts.ts";
 import { factsFor } from "./facts.ts";
-import { revertReason } from "./revert.ts";
+import { isTransport, revertReason } from "./revert.ts";
 import { LENS, LIQUIDATOR, MARKETS, MIN_PROFIT_USD, PROFIT_MARGIN_BPS, WARN_HF, account, log, pub, wallet } from "./env.ts";
 
 const WAD = 10n ** 18n;
@@ -34,6 +34,17 @@ type Candidate = {
   debt: bigint;
 };
 
+/**
+ * Consecutive failed passes a market may have before a transport failure is worth waking someone
+ * for. At roughly one pass every five seconds this is about half a minute of the node being
+ * unreachable — long enough that it is not a hiccup, short enough that a real outage still reaches
+ * an operator while it matters.
+ */
+const TRANSPORT_MISSES_BEFORE_ALERT = Number(process.env.TRANSPORT_MISSES ?? 6);
+
+/** Market id → consecutive failed reads. Cleared the moment one succeeds. */
+const unreadable = new Map<string, number>();
+
 /** Health of every watched borrower, worst first. */
 export async function scanHealth(watch: Map<string, Set<string>>): Promise<Candidate[]> {
   const out: Candidate[] = [];
@@ -60,6 +71,10 @@ export async function scanHealth(watch: Map<string, Set<string>>): Promise<Candi
         }),
       );
 
+      // The market answered, so whatever was wrong is over. Clearing here rather than on the next
+      // failure is what makes the counter mean "consecutive" rather than "ever".
+      if (unreadable.delete(id)) log(`${key}: readable again`);
+
       for (const { user, v } of views) {
         if (v.borrowAssets === 0n) continue;
         out.push({
@@ -72,10 +87,36 @@ export async function scanHealth(watch: Map<string, Set<string>>): Promise<Candi
         });
       }
     } catch (e) {
-      await alert(
-        `unreadable-market:${id}`,
-        `Cannot read health on ${key} (${users.size} watched borrower(s)): ${revertReason(e)}. Liquidations on this market are blind until this clears.`,
-      );
+      /**
+       * A blip is not an outage, and paging someone for a blip is how a monitor gets muted.
+       *
+       * This pass runs every few seconds against a free public node that rate-limits whenever the
+       * indexer is backfilling beside it. The first version alerted on the first failed read, so a
+       * 429 that cleared before anyone could open the message still sent "liquidations are blind" —
+       * twice in one day, both times about a market that was fine. An operator who has been woken
+       * for that twice stops reading the third one, and the third one is the real one.
+       *
+       * So a transport failure has to persist across several consecutive passes before it is worth
+       * anyone's attention, while a REVERT still alerts immediately: the contract is telling us
+       * something that will still be true in ten seconds, and that is the case where minutes matter.
+       */
+      const transport = isTransport(e);
+      const misses = (unreadable.get(id) ?? 0) + 1;
+      unreadable.set(id, misses);
+
+      if (!transport) {
+        await alert(
+          `unreadable-market:${id}`,
+          `Cannot read health on ${key} (${users.size} watched borrower(s)): ${revertReason(e)}. The contract refused the read, so liquidations on this market are blind until this clears.`,
+        );
+      } else if (misses >= TRANSPORT_MISSES_BEFORE_ALERT) {
+        await alert(
+          `unreachable-market:${id}`,
+          `Cannot reach the chain to read ${key} — ${misses} consecutive passes failed (${revertReason(e)}). This is the RPC, not the contract, but liquidations on this market are blind while it lasts.`,
+        );
+      } else {
+        log(`${key}: read failed (${revertReason(e)}), attempt ${misses} — retrying, not alerting`);
+      }
     }
   }
 
