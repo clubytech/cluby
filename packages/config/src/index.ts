@@ -696,6 +696,7 @@ export const deployments: {
   stakingRewards?: `0x${string}`;
   merkleDistributor?: `0x${string}`;
   creditRegistry?: `0x${string}`;
+  tokenRegistry?: `0x${string}`;
   metaMorphoFactory?: `0x${string}`;
   safe?: `0x${string}`;
   deployer?: `0x${string}`;
@@ -708,14 +709,26 @@ export const deployments: {
   markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
   /**
-   * Fourth Lens. The second (0x5FC2CD44…) divided by `collateral.wMulDown(lltv)` without checking
+   * Fifth Lens. The second (0x5FC2CD44…) divided by `collateral.wMulDown(lltv)` without checking
    * it for zero, so one raw unit of an 18-decimal collateral panicked the read — and took every
    * batch and every keeper pass that touched the market with it. The third (0x7148C4F9…) fixed
    * that but published the borrow rate off the accrued struct, which reads the IRM's own stale
    * rateAtTarget and skips the adaptation across the window: a rate half again too high on a
    * market nobody had touched for a week.
+   *
+   * The fourth (0x6159fbBe…) was worse than all of them and looked like none: it was deployed by
+   * hand, outside the scripts here, and its constructor was given 0x9d53D5E3e51a… — an address
+   * with no code that shares four leading bytes with Morpho's. A high-level call into an address
+   * with no code reverts with EMPTY data, so every view reverted with no reason, on every market,
+   * and the keeper reported it as "cannot read health on NVDA" — a market problem, not a deploy
+   * problem. It read that way for as long as it took to trace by hand.
+   *
+   * Two things stop it recurring, and neither is vigilance: `Lens`'s constructor now rejects an
+   * address with no code, and `script/DeployLens.s.sol` takes the address from
+   * `config/markets.json` rather than an argument and calls `marketView` on a live market through
+   * the contract it just deployed before it will print an address to paste here.
    */
-  lens: "0x6159fbBe4d521fd673A496948910791d7eec7B58",
+  lens: "0x7C245bE765ee1363Cdd5D9906d7D0d09be200F22",
   /**
    * Third liquidator. The first (0xDCc269c0…) collapsed the flash-loan size and the swap floor into
    * one number; the second (0x91B3c5b8…) measured solvency against the size of the flash loan
@@ -728,6 +741,12 @@ export const deployments: {
   leverageRouter: "0x12aD902c5004d5147D7F46dC97818cA26Fcb25cf",
   /** Scores only; it moves what a borrower is paid, never what they may borrow. */
   creditRegistry: "0x86e8f3Bf88087774a530d70FfaD19b5257054E53",
+  /**
+   * Where the token's address gets announced. Empty until launch, owned by the Safe, and read by
+   * /token and /admin — so publishing the contract address is a transaction the owner signs, not a
+   * deploy and not a row somebody with a password can change.
+   */
+  tokenRegistry: "0xD0A32d0bA6efa91b2637af14fD1580FE3ddB337A",
   /**
    * Safe 1.4.1+L2, 1-of-1 on the deploy key for now — add owners and raise the threshold from the
    * Safe itself. It owns the vault, the liquidator and the credit registry; the deploy key owns

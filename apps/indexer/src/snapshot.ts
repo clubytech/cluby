@@ -19,6 +19,55 @@ const archive = createPublicClient({
   }),
 });
 
+/**
+ * The same reads, against the free public node.
+ *
+ * The archive endpoint is a metered plan, and once its monthly allowance is spent the snapshots
+ * stop and the charts go flat — while the thing being read, nine times out of ten, is the CURRENT
+ * block, which any node can answer. Paying an archive provider to tell us what the tip looks like
+ * is the whole of the bill for none of the reason we bought it.
+ */
+const live = createPublicClient({
+  chain: robinhoodChain,
+  transport: http(process.env.PONDER_LOGS_RPC ?? "https://rpc.mainnet.chain.robinhood.com", {
+    fetchOptions: { headers: { "user-agent": "cluby-indexer/1.0" } },
+    retryCount: 2,
+    timeout: 20_000,
+  }),
+});
+
+/**
+ * How far back the public node still holds state. Measured, not assumed: it answers `market()` at
+ * 5,000 blocks and fails at 20,000, and a block is ~214 ms here, so 5,000 is about eighteen
+ * minutes. Half of the proven depth is the budget, because the node's pruning is its business and
+ * may tighten without telling us — and a snapshot that silently reads nothing is worse than one
+ * that costs a compute unit.
+ */
+const PUBLIC_STATE_DEPTH = BigInt(process.env.PUBLIC_STATE_DEPTH ?? 2_500);
+
+let tip = 0n;
+let tipAt = 0;
+
+/**
+ * The public node for anything near the tip, the archive for the rest.
+ *
+ * In steady state — live indexing, one snapshot every five minutes at the block that just arrived —
+ * this never touches the archive at all. It is only the backfill, which runs once, that needs it.
+ */
+async function clientFor(blockNumber: bigint) {
+  const now = Date.now();
+  if (now - tipAt > 30_000) {
+    // A failure here must not decide the routing: fall through to the archive, which is correct at
+    // any depth, rather than guess that a block is recent and read nothing.
+    const n = await live.getBlockNumber().catch(() => null);
+    if (n !== null) {
+      tip = n;
+      tipAt = now;
+    }
+  }
+  return tip > 0n && blockNumber + PUBLIC_STATE_DEPTH >= tip ? live : archive;
+}
+
 const BLUE = morpho.blue.address as `0x${string}`;
 const IRM = morpho.adaptiveCurveIrm.address as `0x${string}`;
 const marketIds = Object.entries(deployments.markets).map(([key, m]) => ({ key, id: m.id as `0x${string}` }));
@@ -42,7 +91,9 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
   const blockNumber = event.block.number;
   if (marketIds.length === 0) return;
 
-  const paramsAndState = await archive
+  const rpc = await clientFor(blockNumber);
+
+  const paramsAndState = await rpc
     .multicall({
       contracts: marketIds.flatMap(({ id }) => [
         { address: BLUE, abi: morphoBlueAbi, functionName: "idToMarketParams", args: [id] } as const,
@@ -62,7 +113,7 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
     state: { totalSupplyAssets: bigint; totalSupplyShares: bigint; totalBorrowAssets: bigint; totalBorrowShares: bigint; lastUpdate: bigint; fee: bigint };
   };
 
-  const live: Live[] = [];
+  const markets: Live[] = [];
   marketIds.forEach(({ key, id }, i) => {
     const p = paramsAndState[i * 2];
     const s = paramsAndState[i * 2 + 1];
@@ -72,7 +123,7 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
     // error rather than a missing number.
     if (pr[4] === 0n) return;
     const sr = s.result as readonly [bigint, bigint, bigint, bigint, bigint, bigint];
-    live.push({
+    markets.push({
       key,
       id,
       params: { loanToken: pr[0], collateralToken: pr[1], oracle: pr[2], irm: pr[3], lltv: pr[4] },
@@ -87,11 +138,11 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
     });
   });
 
-  if (live.length === 0) return;
+  if (markets.length === 0) return;
 
-  const ratesAndPrices = await archive
+  const ratesAndPrices = await rpc
     .multicall({
-      contracts: live.flatMap((m) => [
+      contracts: markets.flatMap((m) => [
         { address: IRM, abi: irmAbi, functionName: "borrowRateView", args: [m.params, m.state] } as const,
         { address: m.params.oracle, abi: oracleAbi, functionName: "price" } as const,
       ]),
@@ -100,7 +151,7 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
     })
     .catch(() => null);
 
-  for (const [i, m] of live.entries()) {
+  for (const [i, m] of markets.entries()) {
     const rate = ratesAndPrices?.[i * 2];
     const price = ratesAndPrices?.[i * 2 + 1];
 
@@ -134,7 +185,7 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
   }
 
   if (watchedFeeds.length === 0) return;
-  const rounds = await archive
+  const rounds = await rpc
     .multicall({
       contracts: watchedFeeds.map(
         (f) => ({ address: f.feed, abi: chainlinkFeedAbi, functionName: "latestRoundData" }) as const,

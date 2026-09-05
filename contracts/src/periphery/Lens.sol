@@ -24,6 +24,14 @@ contract Lens {
 
     IMorpho public immutable morpho;
 
+    /// @dev A Lens pointing at an address with no code answers every question by reverting with no
+    /// data — a failure that looks exactly like a bad market rather than a bad deploy. The fourth
+    /// deployed Lens did exactly that: its constructor was handed an address sharing four leading
+    /// bytes with Morpho's and nothing else, so `marketView` reverted on every market and the
+    /// keeper reported the markets as unreadable. The check is one SLOAD-free opcode at deploy time
+    /// and it makes that class of deploy impossible.
+    error MorphoHasNoCode(address given);
+
     struct MarketView {
         Id id;
         MarketParams params;
@@ -49,6 +57,7 @@ contract Lens {
     }
 
     constructor(address _morpho) {
+        if (_morpho.code.length == 0) revert MorphoHasNoCode(_morpho);
         morpho = IMorpho(_morpho);
     }
 
