@@ -48,15 +48,43 @@ have no TWAP leg, so the weekend-gap protection `MinOracle` was written for is
 not switched on anywhere. Not addressed here; it needs a market-by-market
 decision about which second leg to trust, not a code change.
 
+## Two things the fork suite caught that reading did not
+
+**A mistake of my own.** Stamping `lastUpdate` inside `_accrued` was right for
+the struct, but `marketView` then asked the IRM about that struct — and the IRM's
+`rateAtTarget` is stale on exactly the same schedule, since both only move when
+Morpho accrues. Asking with elapsed at zero returns the rate from the last
+interaction with the adaptation across the window skipped: 303332813 against the
+199995138 Morpho would charge, half again too high on a market untouched for a
+week. The rate is read from the raw market now. Caught by
+`ProofLensState.fork.t.sol` against real Morpho with a real borrower and a
+seven-day warp, and it cost a fourth Lens deploy.
+
+**A finding that refuted itself.** "close() needs idle liquidity it cannot
+guarantee" turns out to be mostly false. Morpho Blue holds every market's assets
+in one contract balance and `flashLoan` lends from that balance, not from the
+market's own idle supply — so a fully drawn market, every supplied dollar
+borrowed, still closes. Measured on a fork:
+`test_closeSurvivesAFullyDrawnMarket`. Only a Morpho holding no USDG anywhere
+would block it, and the fallback is a direct repay that needs no liquidity at all.
+
 ## Deployed
 
-    Lens             0x7148C4F98cA8a4752692C4926E11d2e36E6f066D
+    Lens             0x6159fbBe4d521fd673A496948910791d7eec7B58
     FlashLiquidator  0xC3374D9fB0CC9a85440f26EE461aF6Bfb6c6e7cE
     LeverageRouter   0x12aD902c5004d5147D7F46dC97818cA26Fcb25cf
 
 Verified against the chain, not the broadcast log: the old Lens reverts on one
 raw unit of collateral and the new one answers `never liquidatable`; the four
 live markets read identically through both.
+
+## One test is red on purpose
+
+`test_knownRed_twapPoolRingCannotHoldTheOracleWindow` asserts the three TWAP
+pools carry enough observation slots for their window. They do not — 300 to 360
+against 1,800 — and that is the unfunded item below, not a regression. It is
+named so nobody spends an afternoon on it, and it turns green the moment
+`grow-twap-rings.sh --send` has run and the swaps have caught up.
 
 ## Still open, and why
 

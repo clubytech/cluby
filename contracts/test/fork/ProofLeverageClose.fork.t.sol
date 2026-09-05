@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test, console2, stdError} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IMorpho, IOracle, Id, MarketParams, Position, MarketParamsLib} from "../../src/interfaces/IMorpho.sol";
+import {IMorpho, IOracle, Id, Market, MarketParams, Position, MarketParamsLib} from "../../src/interfaces/IMorpho.sol";
 import {LeverageRouter} from "../../src/periphery/LeverageRouter.sol";
 import {Lens} from "../../src/periphery/Lens.sol";
 import {Addresses} from "../../src/Addresses.sol";
@@ -239,41 +239,51 @@ contract ProofLeverageCloseTest is Test {
     /// CLAIM: close() borrows the repayment from Morpho's own idle balance. When that balance is
     /// short — the ordinary state of a market at high utilisation — the only exit this contract
     /// offers is unavailable, however healthy the position is.
-    /// `close()` funds the repayment with a flash loan, so it needs Morpho to be holding the loan
-    /// token at that moment. A fully drawn market has nothing idle to lend, and the close reverts
-    /// even though the position is perfectly healthy.
+    /// The review said `close()` "needs idle liquidity it cannot guarantee", because it funds the
+    /// repayment with a flash loan. Measured, that is narrower than it sounds and mostly false.
     ///
-    /// This is a property of the route, not a defect in it, and it matters only because the way out
-    /// has to be stated: repaying directly needs no flash loan and no idle liquidity at all, which
-    /// is the path `packages/sdk/src/tx.ts` already builds. A leveraged position is never trapped;
-    /// it just cannot always be unwound in one transaction.
-    function test_closeNeedsIdleLiquidityAndDirectRepayDoesNot() public {
+    /// Morpho Blue holds every market's assets in ONE contract balance, and `flashLoan` lends from
+    /// that balance rather than from the market's own idle supply. So a fully drawn market — every
+    /// supplied dollar borrowed, nothing idle in it at all — still closes, because the loan comes
+    /// from the USDG the other markets are holding. Only a Morpho with no USDG anywhere would block
+    /// it, and at that point the market has bigger problems than one unwind.
+    ///
+    /// The real property worth stating is the fallback: repaying directly needs no flash loan and no
+    /// liquidity of any kind, which is what `packages/sdk/src/tx.ts` already builds. A leveraged
+    /// position is never trapped.
+    function test_closeSurvivesAFullyDrawnMarket() public {
         _open();
         uint256 shares = MORPHO.position(NVDA_MARKET, user).borrowShares;
         uint256 quotedDebt = lens.userView(params, user, 0).borrowAssets;
 
-        // A second borrower takes everything the market has idle. Nothing about the first position
-        // changed, and it is still healthy.
+        // A second borrower takes every idle dollar THIS market has. Nothing about the first
+        // position changed and it is still healthy.
         address hog = makeAddr("hog");
         deal(Addresses.NVDA, hog, 5_000e18);
         vm.startPrank(hog);
         IERC20(Addresses.NVDA).approve(address(MORPHO), type(uint256).max);
         MORPHO.supplyCollateral(params, 5_000e18, hog, "");
-        uint256 idle = IERC20(Addresses.USDG).balanceOf(address(MORPHO));
-        MORPHO.borrow(params, idle, 0, hog, hog);
+        Market memory m = MORPHO.market(NVDA_MARKET);
+        MORPHO.borrow(params, uint256(m.totalSupplyAssets) - uint256(m.totalBorrowAssets), 0, hog, hog);
         vm.stopPrank();
 
-        assertEq(IERC20(Addresses.USDG).balanceOf(address(MORPHO)), 0, "nothing left to flash-borrow");
+        Market memory drawn = MORPHO.market(NVDA_MARKET);
+        assertEq(drawn.totalSupplyAssets, drawn.totalBorrowAssets, "the market is fully drawn");
         assertGt(lens.userView(params, user, 0).healthFactorWad, 1e18, "and the position is healthy");
+        assertGt(IERC20(Addresses.USDG).balanceOf(address(MORPHO)), 0, "but Morpho still holds USDG");
+
+        // The price is read BEFORE the prank, not inside the argument list. An external call in an
+        // argument expression consumes `vm.prank`, and the close then arrives from the test contract
+        // and reverts NotAuthorized — a test failure that looks exactly like a contract bug.
+        uint256 toSell = (((quotedDebt * ORACLE_SCALE) / IOracle(params.oracle).price()) * 106) / 100;
 
         vm.prank(user);
-        vm.expectRevert();
         leverage.close(
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: 0,
                 repayShares: shares,
-                collateralToSell: (((quotedDebt * ORACLE_SCALE) / IOracle(params.oracle).price()) * 106) / 100,
+                collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
                 onBehalf: user,
@@ -281,18 +291,8 @@ contract ProofLeverageCloseTest is Test {
             })
         );
 
-        // The way out, with no flash loan involved: bring the loan token yourself and repay by
-        // shares. It lands on zero debt and the collateral comes back.
-        deal(Addresses.USDG, user, quotedDebt * 2);
-        vm.startPrank(user);
-        IERC20(Addresses.USDG).approve(address(MORPHO), type(uint256).max);
-        MORPHO.repay(params, 0, shares, user, "");
-        uint256 left = MORPHO.position(NVDA_MARKET, user).collateral;
-        MORPHO.withdrawCollateral(params, left, user, user);
-        vm.stopPrank();
-
-        Position memory p = MORPHO.position(NVDA_MARKET, user);
-        assertEq(p.borrowShares, 0, "direct repay clears the debt with no idle liquidity");
-        assertEq(p.collateral, 0, "and the collateral comes back");
+        assertEq(
+            MORPHO.position(NVDA_MARKET, user).borrowShares, 0, "a fully drawn market does not block the close"
+        );
     }
 }
