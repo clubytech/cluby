@@ -79,24 +79,80 @@ contract EconProofsForkTest is Test {
 
     // The other half of the same mechanism, measured against the live pool rather than argued:
     // once the requested window is older than the oldest buffered observation, `observe` reverts.
-    function test_proof_observeSurvivesAWindowLongerThanTheBuffer() public {
+    /// Uniswap's `observe` reverts `OLD` for anything past the end of the ring. That is correct
+    /// behaviour and the reason the ring size is a safety parameter rather than a detail: a window
+    /// the pool cannot reach back over is not a long window, it is an oracle that stops answering —
+    /// and `price()` reverting takes borrow, withdrawCollateral and liquidate down with it.
+    ///
+    /// The live pool serves its configured 1,800-second window today. What this pins is the cliff
+    /// just past the buffer, so the constructor check has a measured reason to exist.
+    function test_observeRevertsPastTheEndOfTheRing() public {
         (,, uint16 index, uint16 cardinality,,,) = IUniswapV3PoolMinimal(HIMS_POOL).slot0();
         (uint32 oldestTs,,, bool init) = IPoolObservations(HIMS_POOL).observations((index + 1) % cardinality);
         if (!init) (oldestTs,,,) = IPoolObservations(HIMS_POOL).observations(0);
 
         uint32 span = uint32(block.timestamp) - oldestTs;
         console2.log("HIMS pool buffered history (s)", span);
+        assertGt(span, WINDOW, "the live pool still covers its window");
+
+        uint32[] memory ok = new uint32[](2);
+        ok[0] = WINDOW;
+        ok[1] = 0;
+        IUniswapV3PoolMinimal(HIMS_POOL).observe(ok);
 
         uint32[] memory ago = new uint32[](2);
         ago[0] = span + 600; // just past the end of the buffer
         ago[1] = 0;
+        vm.expectRevert(bytes("OLD"));
         IUniswapV3PoolMinimal(HIMS_POOL).observe(ago);
     }
 
     // And the consequence, end to end against the real Morpho: an underwater borrower on a
     // TWAP-priced market cannot be liquidated while `observe` is unavailable.
-    function test_proof_twapMarketStaysLiquidatableWhenObserveIsUnavailable() public {
+    /// The oracle now refuses to be built against a ring that cannot hold its window, so this
+    /// scenario cannot be listed in the first place. Growing the ring is permissionless, which is
+    /// why the check is a listing-time chore rather than a restriction on which pools can be used.
+    function test_twapOracleRefusesTheLiveRingUntilItIsGrown() public {
+        (,,, uint16 cardinality,,,) = IUniswapV3PoolMinimal(HIMS_POOL).slot0();
+        assertLt(cardinality, WINDOW, "HIMS ring is still short of its window");
+
+        vm.expectRevert(abi.encodeWithSelector(TwapOracle.RingTooSmall.selector, cardinality, WINDOW));
+        new TwapOracle(HIMS_POOL, HIMS, USDG, WINDOW);
+
+        // Anyone can pay for the slots. But `increaseObservationCardinalityNext` only raises the
+        // TARGET: `observationCardinality` itself does not move until a tick-moving swap wraps the
+        // index past the old end, which on a quiet pool can take a while. That is why the check
+        // reads the live cardinality and not the next one — a ring that is merely paid for is not a
+        // ring you can observe over — and why listing is a two-step: grow it, then wait for it.
+        IUniswapV3PoolMinimal(HIMS_POOL).increaseObservationCardinalityNext(uint16(WINDOW));
+        (,,, uint16 afterPaying,,,) = IUniswapV3PoolMinimal(HIMS_POOL).slot0();
+        assertEq(afterPaying, cardinality, "paying for slots does not grow the ring by itself");
+        vm.expectRevert(abi.encodeWithSelector(TwapOracle.RingTooSmall.selector, cardinality, WINDOW));
+        new TwapOracle(HIMS_POOL, HIMS, USDG, WINDOW);
+
+        // Once the swaps have caught up and the ring really is that size, it constructs.
+        _pretendRingIsGrown();
+        TwapOracle grown = new TwapOracle(HIMS_POOL, HIMS, USDG, WINDOW);
+        assertGt(grown.price(), 0, "and then it prices normally");
+    }
+
+    /// @dev Report a grown ring from slot0 without simulating the thousand swaps that would grow it.
+    function _pretendRingIsGrown() internal {
+        (uint160 sqrtP, int24 tick, uint16 index,, uint16 next, uint8 fee, bool unlocked) =
+            IUniswapV3PoolMinimal(HIMS_POOL).slot0();
+        vm.mockCall(
+            HIMS_POOL,
+            abi.encodeWithSelector(IUniswapV3PoolMinimal.slot0.selector),
+            abi.encode(sqrtP, tick, index, uint16(WINDOW), next, fee, unlocked)
+        );
+    }
+
+    /// Kept whole: once the ring is grown, a market on this oracle behaves. The body below is the
+    /// original scenario, which is still the one worth being sure of.
+    function test_twapMarketStaysLiquidatableWhenObserveIsUnavailable() public {
+        _pretendRingIsGrown();
         TwapOracle oracle = new TwapOracle(HIMS_POOL, HIMS, USDG, WINDOW);
+        vm.clearMockedCalls();
         MarketParams memory params = MarketParams({
             loanToken: USDG,
             collateralToken: HIMS,
@@ -151,19 +207,34 @@ contract EconProofsForkTest is Test {
     //   repaid        = seizedValue / LIF       (liquidate.ts:98)
     //   skip unless minAmountOut > flashAmount  (liquidate.ts:102)
     // => the keeper acts only while 0.92 > 1.01/LIF, i.e. LLTV < 70.297%.
-    function test_proof_keeperGateAllowsLiquidationOnEveryDeployedLltv() public pure {
+    /// The keeper's swap floor used to be a flat 92% of the collateral's oracle value while the
+    /// repayment is that value divided by the liquidation premium. Those two cross at LLTV 70.297%:
+    /// above it the floor sat BELOW the repayment, so the gate refused every liquidation on ETH and
+    /// SGOV, in every state, silently.
+    ///
+    /// Deriving the floor from the repayment removes the threshold. What narrows with the premium
+    /// is the slippage budget, which is the thing that should narrow: at 86% LLTV the premium
+    /// really is only 4.4%, so there really is only 3.7% of room to sell into.
+    function test_keeperSizingWorksOnEveryDeployedLltv() public pure {
         uint256[4] memory lltvs = [uint256(0.385e18), 0.625e18, 0.77e18, 0.86e18];
         string[4] memory who = ["long-tail 38.5%", "stocks 62.5%", "ETH 77%", "SGOV 86%"];
 
         uint256 seizedValue = 1_000e6; // 1000 USDG of collateral seized
+        uint256 maxSlippageWad = 0.08e18; // FlashLiquidator's own floor
+        uint256 marginBps = 50; // PROFIT_MARGIN_BPS
+
         for (uint256 i; i < 4; ++i) {
             uint256 lif = _lif(lltvs[i]);
             uint256 repaid = (seizedValue * 1e18) / lif;
-            uint256 flashAmount = (repaid * 101) / 100;
-            uint256 minAmountOut = (seizedValue * 92) / 100;
-            console2.log(who[i], "flash", flashAmount);
-            console2.log("   minOut", minAmountOut);
-            assertGt(minAmountOut, flashAmount, "keeper skips every liquidation on this market");
+
+            uint256 minAmountOut = repaid + (repaid * marginBps) / 10_000;
+            uint256 contractFloor = (seizedValue * (1e18 - maxSlippageWad)) / 1e18;
+            if (contractFloor > minAmountOut) minAmountOut = contractFloor;
+
+            console2.log(who[i], "minOut", minAmountOut);
+            assertGt(minAmountOut, repaid, "the sale must beat the repayment");
+            assertLe(minAmountOut, seizedValue, "and must be fillable at the oracle price");
+            assertGe(minAmountOut, contractFloor, "and must not sit under the contract's own floor");
         }
     }
 

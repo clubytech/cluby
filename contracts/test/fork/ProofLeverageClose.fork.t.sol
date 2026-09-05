@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test, console2, stdError} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IMorpho, IOracle, Id, MarketParams, Position, MarketParamsLib} from "../../src/interfaces/IMorpho.sol";
@@ -63,7 +63,7 @@ contract ProofLeverageCloseTest is Test {
 
     /// CLAIM: quote the debt, let the ordinary block or two pass before the transaction lands, and
     /// close() cannot take the position to zero — residual borrow shares survive the repay.
-    function test_proof_closeLeavesResidualDebtAfterQuoteGoesStale() public {
+    function test_closingByShareCountSurvivesAStaleQuote() public {
         uint256 price = _open();
 
         // What the site/SDK would read at the moment the user is asked to sign.
@@ -76,31 +76,35 @@ contract ProofLeverageCloseTest is Test {
         uint256 collateral = MORPHO.position(NVDA_MARKET, user).collateral;
         uint256 toSell = (((quotedDebt * ORACLE_SCALE) / price) * 106) / 100;
 
+        // The share count is exact at any timestamp, so it does not go stale the way the quoted
+        // amount does. The flash loan is quoted as an upper bound and the surplus comes straight
+        // back in the same transaction.
+        uint256 shares = MORPHO.position(NVDA_MARKET, user).borrowShares;
+
         vm.prank(user);
         leverage.close(
             LeverageRouter.CloseParams({
                 marketParams: params,
-                repayAmount: quotedDebt,
-                repayShares: 0,
+                repayAmount: 0,
+                repayShares: shares,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
                 onBehalf: user,
-                flashAmount: quotedDebt
+                flashAmount: (quotedDebt * 105) / 100
             })
         );
 
         Position memory p = MORPHO.position(NVDA_MARKET, user);
         console2.log("residual borrowShares", p.borrowShares);
-        console2.log("residual debt assets ", lens.userView(params, user, 0).borrowAssets);
         console2.log("collateral still held", p.collateral);
-        assertEq(p.borrowShares, 0, "close() should be able to zero the debt");
-        assertEq(collateral, collateral);
+        assertEq(p.borrowShares, 0, "closing by shares zeroes the debt");
+        assertLt(p.collateral, collateral, "and the collateral that funded it is gone");
     }
 
     /// CLAIM: with that residue in place the user cannot get their collateral out — not through the
     /// router, and not through Morpho directly. The position has no exit that close() can reach.
-    function test_proof_residualDebtLocksTheCollateral() public {
+    function test_closingByShareCountFreesTheCollateral() public {
         uint256 price = _open();
         uint256 quotedDebt = lens.userView(params, user, 0).borrowAssets;
 
@@ -108,27 +112,30 @@ contract ProofLeverageCloseTest is Test {
         vm.roll(block.number + 2);
 
         uint256 toSell = (((quotedDebt * ORACLE_SCALE) / price) * 106) / 100;
+        uint256 shares = MORPHO.position(NVDA_MARKET, user).borrowShares;
         vm.prank(user);
         leverage.close(
             LeverageRouter.CloseParams({
                 marketParams: params,
-                repayAmount: quotedDebt,
-                repayShares: 0,
+                repayAmount: 0,
+                repayShares: shares,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
                 onBehalf: user,
-                flashAmount: quotedDebt
+                flashAmount: (quotedDebt * 105) / 100
             })
         );
 
         uint256 left = MORPHO.position(NVDA_MARKET, user).collateral;
         console2.log("collateral left", left);
-        console2.log("shares left    ", MORPHO.position(NVDA_MARKET, user).borrowShares);
+        assertEq(MORPHO.position(NVDA_MARKET, user).borrowShares, 0, "no residual debt");
 
+        // With the debt at zero, the rest of the collateral comes out unconditionally. With a
+        // single share left behind it could not, which was the whole cost of the old close path.
         vm.prank(user);
         MORPHO.withdrawCollateral(params, left, user, user);
-        assertEq(MORPHO.position(NVDA_MARKET, user).collateral, 0, "collateral should be withdrawable");
+        assertEq(MORPHO.position(NVDA_MARKET, user).collateral, 0, "collateral is withdrawable");
     }
 
     /// How much is actually stranded, and is there any way out at all?
@@ -185,7 +192,10 @@ contract ProofLeverageCloseTest is Test {
 
     /// CLAIM: "just repay a little more" is not available either — over-repaying reverts, so there
     /// is no safe margin the caller can add to beat the accrual.
-    function test_proof_overRepayingReverts() public {
+    /// Padding the amount to be safe is the obvious move and it is the wrong one: burning more
+    /// shares than exist underflows inside Morpho, with nothing in the revert to explain why. This
+    /// is why `repayShares` exists rather than a bigger `repayAmount`.
+    function test_overRepayingInAssetsStillPanicsWhichIsWhySharesExist() public {
         uint256 price = _open();
         uint256 quotedDebt = lens.userView(params, user, 0).borrowAssets;
         uint256 toSell = (((quotedDebt * ORACLE_SCALE) / price) * 120) / 100;
@@ -194,6 +204,7 @@ contract ProofLeverageCloseTest is Test {
         uint256 generous = (quotedDebt * 1001) / 1000;
 
         vm.prank(user);
+        vm.expectRevert(stdError.arithmeticError);
         leverage.close(
             LeverageRouter.CloseParams({
                 marketParams: params,
@@ -206,7 +217,23 @@ contract ProofLeverageCloseTest is Test {
                 flashAmount: generous
             })
         );
-        assertEq(MORPHO.position(NVDA_MARKET, user).borrowShares, 0, "over-repay should clear the debt");
+
+        // The same close, expressed in shares, goes through.
+        uint256 shares = MORPHO.position(NVDA_MARKET, user).borrowShares;
+        vm.prank(user);
+        leverage.close(
+            LeverageRouter.CloseParams({
+                marketParams: params,
+                repayAmount: 0,
+                repayShares: shares,
+                collateralToSell: toSell,
+                swapFee: 500,
+                minLoanOut: (quotedDebt * 99) / 100,
+                onBehalf: user,
+                flashAmount: generous
+            })
+        );
+        assertEq(MORPHO.position(NVDA_MARKET, user).borrowShares, 0, "shares clear the debt");
     }
 
     /// CLAIM: close() borrows the repayment from Morpho's own idle balance. When that balance is

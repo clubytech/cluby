@@ -190,11 +190,13 @@ contract ArchProofs is Test {
         assertEq(uint256(v.state.lastUpdate), block.timestamp, "accrued state must not stay stale");
         assertGt(uint256(v.state.lastUpdate), t0);
 
-        // Which makes the published rate the forward one — what Morpho itself would report right
-        // after accruing, at elapsed == 0 — instead of the average across the window just charged.
-        uint256 trueRate = eirm.borrowRateView(params, v.state);
-        assertEq(trueRate, 1e9);
-        assertEq(v.borrowRatePerSecond, trueRate, "quoted rate must be the forward rate");
+        // The published rate still comes off the RAW market, and it has to. The IRM keeps its own
+        // rateAtTarget and moves it only when Morpho accrues, so handing it a state whose clock has
+        // been advanced makes it skip the adaptation for the elapsed window and answer with the
+        // rate from the last interaction. The elapsed window is the question, not the noise.
+        Market memory raw = morpho.market(params.id());
+        assertEq(v.borrowRatePerSecond, eirm.borrowRateView(params, raw), "rate must come off the raw market");
+        assertEq(v.borrowRatePerSecond, 1e9 + 3 days);
     }
 
     /* ------------------------------------------------------------------ */

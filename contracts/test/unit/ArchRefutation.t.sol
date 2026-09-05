@@ -182,12 +182,12 @@ contract ArchRefutation is Test {
     /// writes lastUpdate. Lens does the same thing, so the accrued debt — the only number here that
     /// moves money — is bit-identical to Morpho's.
     ///
-    /// What was actually wrong was narrower, and is now fixed: `marketView` makes a SECOND
-    /// borrowRateView call on the already-accrued struct. While `_accrued` left `lastUpdate` in the
-    /// past, that second call was answered for a window that had already been charged, so the
-    /// published APY was the trailing average rather than the forward rate. Stamping the timestamp
-    /// makes the quote forward-looking without touching the debt, which this test pins from both
-    /// sides.
+    /// The narrower complaint — that `marketView` makes a SECOND borrowRateView call — survives,
+    /// and the answer to it is not the obvious one. Advancing the clock before that call does NOT
+    /// produce a forward rate: the IRM's own rateAtTarget is stale on the same schedule, so it
+    /// would answer with the rate from the last interaction and skip the adaptation across the
+    /// window. The rate is read from the raw market on purpose. What the fix changed is the state
+    /// the Lens hands back, which now carries its own timestamp.
     function test_refute_lensAccruesExactlyWhatMorphoWouldAccrue() public {
         ElapsedIrm eirm = new ElapsedIrm(1e9);
         params.irm = address(eirm);
@@ -219,17 +219,12 @@ contract ArchRefutation is Test {
             uint256(tBorrow) + morphoInterest,
             "Lens debt differs from Morpho's"
         );
-        // Not "twice": exactly once, with the same rate Morpho itself uses. The debt above is the
-        // proof of that; it is bit-identical.
-        //
-        // The quoted rate is a different number on purpose. `_accrued` now stamps `lastUpdate`, so
-        // the IRM is asked about a market with no unaccounted seconds in it and answers with the
-        // rate from here on — which is what an APY on a screen means. The old behaviour returned
-        // `morphoRate`, the average across the window that was just charged.
-        Market memory current = v.state;
-        assertEq(uint256(current.lastUpdate), block.timestamp, "accrued state still claims to be stale");
-        assertEq(v.borrowRatePerSecond, eirm.borrowRate(params, current), "quote is not the forward rate");
-        assertLt(v.borrowRatePerSecond, morphoRate, "quote did not move off the trailing average");
+        // Not "twice": exactly once, with the same rate Morpho itself uses.
+        assertEq(v.borrowRatePerSecond, morphoRate, "the quoted rate is the accrual rate, not a doubled one");
+        // And the state that comes back now carries the time its totals are good for, which is the
+        // part that was genuinely wrong: a struct with accrued totals and a stale clock describes a
+        // market no Morpho storage slot could hold.
+        assertEq(uint256(v.state.lastUpdate), block.timestamp, "accrued state still claims to be stale");
     }
 
     /* ================================================================== */

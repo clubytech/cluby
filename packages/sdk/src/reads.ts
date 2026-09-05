@@ -103,7 +103,14 @@ export async function getAccruedMarketState(
   return accrued(client, params, await getMarketState(client, id));
 }
 
-/** Borrow rate the market charges right now, compounded to a yearly figure. */
+/**
+ * Borrow rate the market charges, compounded to a yearly figure.
+ *
+ * Pass the RAW state, not an accrued one. The IRM stores its own `rateAtTarget` and only moves it
+ * when Morpho accrues, so a state whose `lastUpdate` has been advanced makes the IRM skip the
+ * adaptation for the elapsed window and answer with the rate from the last interaction. Asking with
+ * the real elapsed window gives the average rate across it, which is what Morpho will charge.
+ */
 export async function getRates(client: PublicClient, params: MarketParams, state: MarketState) {
   const perSecond = await client.readContract({
     address: (params.irm === "0x0000000000000000000000000000000000000000" ? IRM : params.irm) as Address,

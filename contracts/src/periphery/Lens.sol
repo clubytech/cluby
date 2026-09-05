@@ -55,13 +55,23 @@ contract Lens {
     function marketView(MarketParams memory params) public view returns (MarketView memory v) {
         v.id = params.id();
         v.params = params;
-        v.state = _accrued(params, v.id);
+
+        // The rate comes off the RAW market, before accrual, and that is not a slip. The IRM's
+        // stored `rateAtTarget` goes stale on exactly the same schedule `lastUpdate` does — both
+        // only move when Morpho accrues — so asking the IRM about a state whose clock has been
+        // advanced does NOT produce the current rate. It produces the rate from the last
+        // interaction, with the adaptation over the intervening window skipped. Asking with the
+        // real elapsed window gives the average rate across it, which is the number Morpho will
+        // actually charge, and the closest thing to a forward rate this can be answered with.
+        Market memory raw = morpho.market(v.id);
+        v.borrowRatePerSecond = IIrm(params.irm).borrowRateView(params, raw);
+
+        v.state = _accrued(params, raw);
 
         v.utilizationWad = v.state.totalSupplyAssets == 0
             ? 0
             : uint256(v.state.totalBorrowAssets).wDivDown(uint256(v.state.totalSupplyAssets));
 
-        v.borrowRatePerSecond = IIrm(params.irm).borrowRateView(params, v.state);
         // Morpho compounds continuously; the Taylor form is what the contract itself uses.
         v.borrowApyWad = v.borrowRatePerSecond.wTaylorCompounded(365 days);
         uint256 feeShare = WAD - uint256(v.state.fee);
@@ -172,8 +182,11 @@ contract Lens {
     }
 
     /// @dev Morpho's own interest accrual, replayed in memory so no state is touched.
-    function _accrued(MarketParams memory params, Id id) internal view returns (Market memory m) {
-        m = morpho.market(id);
+    function _accrued(MarketParams memory params, Id id) internal view returns (Market memory) {
+        return _accrued(params, morpho.market(id));
+    }
+
+    function _accrued(MarketParams memory params, Market memory m) internal view returns (Market memory) {
         uint256 elapsed = block.timestamp - uint256(m.lastUpdate);
         if (elapsed == 0) return m;
         // Morpho stamps the timestamp whether or not anything accrued, and an idle market that
@@ -199,8 +212,8 @@ contract Lens {
         }
 
         // The totals are now current, so the timestamp has to say so. Leaving it behind returns a
-        // struct describing a market that never existed, and anyone who feeds it back to the IRM —
-        // as `marketView` does one line later — is asking about a hybrid state.
+        // struct describing a market that never existed.
         m.lastUpdate = uint128(block.timestamp);
+        return m;
     }
 }

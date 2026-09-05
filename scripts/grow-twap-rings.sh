@@ -16,6 +16,12 @@
 #
 # It is permissionless: any address can pay for it, and the pools keep the slots forever.
 #
+# It is also a TWO-step. `increaseObservationCardinalityNext` raises the target and writes the
+# slots, but `observationCardinality` — the number the oracle actually checks, because it is the one
+# you can observe over — does not move until a tick-moving swap wraps the index past the old end.
+# On a quiet pool that takes a while. So: grow, wait, then list. This script does the growing and
+# reports the live number so you can see when the pool has caught up.
+#
 #   ./scripts/grow-twap-rings.sh              # print the bill and stop
 #   ./scripts/grow-twap-rings.sh --send       # actually grow them
 #   TARGET=900 ./scripts/grow-twap-rings.sh --send   # partial, if funding is short

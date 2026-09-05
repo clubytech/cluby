@@ -92,7 +92,10 @@ export async function describeMarket(def: MarketDef) {
   // Accrued, so "supplied" and "borrowed" are what the market owes now rather than at whatever
   // transaction last touched it.
   const state = await accrued(publicClient, params, raw).catch(() => raw);
-  const rates = await getRates(publicClient, params, state).catch(() => null);
+  // The rate, though, comes off the RAW state: the IRM's stored rateAtTarget is stale on the same
+  // schedule lastUpdate is, so asking it about a clock that has been moved forward returns the rate
+  // from the last interaction rather than the current one.
+  const rates = await getRates(publicClient, params, raw).catch(() => null);
   const unit = 10 ** (def.loan === "USDG" ? USDG_DECIMALS : 18);
 
   return {
