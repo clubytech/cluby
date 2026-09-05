@@ -19,12 +19,18 @@ export function MarketLogo({ subject, size = 36 }: { subject: string; size?: num
   const px = `${size}px`;
 
   if (failed) {
+    // A monogram, not a truncation. "CASHCAT" cut to four characters reads as "CASH" and "INDEX"
+    // as "INDE" — both look like a rendering bug rather than a mark. One or two letters at a size
+    // that fills the disc reads as deliberate, which is what the three chain-native tokens need:
+    // there is no company behind them and there never will be a logo to fetch.
+    const initials = subject.length <= 2 ? subject : subject.slice(0, 2);
     return (
       <span
-        className="num flex shrink-0 items-center justify-center rounded-full bg-bg-strong text-[11px] text-white transition-all duration-250 ease-out group-hover:scale-110 group-hover:bg-brand"
-        style={{ width: px, height: px }}
+        className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-dim font-semibold uppercase leading-none text-white ring-1 ring-brand/25 transition-all duration-250 ease-out group-hover:scale-110 group-hover:ring-brand/50"
+        style={{ width: px, height: px, fontSize: `${Math.round(size * 0.4)}px` }}
+        title={subject}
       >
-        {subject.slice(0, 4)}
+        {initials}
       </span>
     );
   }
