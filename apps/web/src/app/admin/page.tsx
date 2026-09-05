@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { AdminToken } from "@/components/admin-token";
 import { SectionHeading } from "@/components/ui";
 import { deployments, marketCatalog } from "@cluby/config";
@@ -5,16 +6,25 @@ import { getEvents, getAdminActions } from "@/lib/ops";
 import { getIncentives } from "@/lib/incentives";
 
 /**
- * Not in the navigation, and not in an index.
+ * This route does not exist unless the deployment is the admin deployment.
  *
- * There is nothing secret here — every button ends in a transaction the owner signs, and the page
- * can only ask the chain to do what it would already let the connected wallet do. It is unlisted
- * because it is an operator's tool and its presence in search results would only confuse a reader
- * looking for the token.
+ * `cluby.cash/admin` was a guessable path on the public site, and while nothing here can *do*
+ * anything a wallet could not already do — every button ends in a transaction the Safe signs — a
+ * page that looks like a protocol's control panel is a gift to whoever wants to screenshot one for
+ * a phishing post, and the activity feed is an operator's view rather than a visitor's.
+ *
+ * So the page is compiled into every build and served by exactly one of them: the build that was
+ * given ADMIN_SURFACE. Everywhere else this is a 404 before a single byte of operator data is
+ * fetched — not a redirect, not a login wall that confirms the path is real, a 404 that is
+ * indistinguishable from a path that was never there.
+ *
+ * The obscure hostname is worth something and it is worth exactly what it is: it keeps the page out
+ * of casual sight. It is not the lock. The lock is that writes need the Safe, and the second lock
+ * is the deployment protection on the host.
  */
 export const metadata = {
-  title: "Admin — Cluby",
-  robots: { index: false, follow: false },
+  title: "Admin",
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export const dynamic = "force-dynamic";
@@ -51,6 +61,9 @@ const KIND: Record<string, { label: string; tone: string }> = {
 };
 
 export default async function AdminPage() {
+  // Checked before anything is read, so a 404 costs a stranger nothing and tells them nothing.
+  if (!process.env.ADMIN_SURFACE) notFound();
+
   const [events, admin, chain] = await Promise.all([getEvents(150), getAdminActions(), getIncentives()]);
 
   return (

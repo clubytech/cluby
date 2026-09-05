@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConnectButton } from "./connect-button";
 import { Pill, useSlidingPill } from "./sliding-pill";
+import { CaChip } from "./ca-chip";
 
 type Item = { href: string; label: string; soon?: boolean };
 
@@ -54,7 +55,15 @@ function Soon() {
   );
 }
 
-export function SiteHeader({ tokenLive = false }: { tokenLive?: boolean }) {
+export function SiteHeader({
+  tokenLive = false,
+  tokenAddress = null,
+  tokenSymbol = "CLUBY",
+}: {
+  tokenLive?: boolean;
+  tokenAddress?: string | null;
+  tokenSymbol?: string;
+}) {
   // Resolved once: three render sites use these lists and all three must agree.
   const barItems = withTokenState(primary, tokenLive);
   const moreItems = withTokenState(more, tokenLive);
@@ -115,10 +124,18 @@ export function SiteHeader({ tokenLive = false }: { tokenLive?: boolean }) {
     <div className="sticky top-0 left-0 right-0 z-50 px-4 py-6 md:px-6">
       <div className="mx-auto flex max-w-6xl gap-3">
         <div
-          className={`mx-auto w-full bg-bg-strong p-3 transition-[box-shadow,background-color,border-radius] duration-300 ease-out ${
+          className={`mx-auto w-full bg-bg-strong p-3 transition-[box-shadow,background-color] duration-300 ease-out ${
             // A pill only stays a pill while it is one line tall. `border-radius: 9999px` on a box
             // that grows to fit ten menu items is an ellipse, and the items spill straight out of
             // it. The radius has to become a corner as soon as the menu opens.
+            //
+            // And it must SNAP rather than animate, which is why border-radius is not in the
+            // transition list above. Animating it meant that for 300ms the radius was still an
+            // enormous number while the height was already growing — and a browser clamps a radius
+            // to half the shorter side, so a 700px-tall box with a 5000px radius is drawn as a
+            // circle. That is exactly what it looked like: the menu opened as a giant dark disc and
+            // then popped into a panel. Two properties animating against each other, where only one
+            // of them ever needed to.
             open ? "rounded-[28px]" : "rounded-full"
           } ${
             scrolled
@@ -216,7 +233,8 @@ export function SiteHeader({ tokenLive = false }: { tokenLive?: boolean }) {
               </div>
             </nav>
 
-            <div className="hidden items-center gap-3 xl:flex">
+            <div className="hidden items-center gap-2.5 xl:flex">
+              <CaChip address={tokenAddress} symbol={tokenSymbol} />
               <ConnectButton compact />
             </div>
 
@@ -256,7 +274,8 @@ export function SiteHeader({ tokenLive = false }: { tokenLive?: boolean }) {
                   {item.soon && <Soon />}
                 </Link>
               ))}
-              <div className="mb-2 mt-3 flex justify-center">
+              <div className="mb-2 mt-3 flex flex-col items-center gap-3">
+                <CaChip address={tokenAddress} symbol={tokenSymbol} />
                 <ConnectButton />
               </div>
             </nav>

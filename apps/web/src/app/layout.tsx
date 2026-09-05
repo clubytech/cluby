@@ -57,7 +57,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         style={{ background: "#ffffff" }}
       >
         <Providers>
-          <SiteHeader tokenLive={listing.token !== null} />
+          <SiteHeader
+            tokenLive={listing.token !== null}
+            tokenAddress={listing.token}
+            tokenSymbol={listing.symbol || "CLUBY"}
+          />
           <main>{children}</main>
           <SiteFooter />
         </Providers>

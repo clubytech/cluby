@@ -1,19 +1,13 @@
 import { getMarkets, getProtocolStats } from "@/lib/markets";
 import { usd, pct } from "@/lib/format";
 import { Button, Card, SectionHeading, Stat } from "@/components/ui";
-import { CaBanner } from "@/components/ca-banner";
-import { getTokenListing } from "@/lib/token-listing";
 import { MarketTable } from "@/components/market-table";
 import { HeroField } from "@/components/hero-field";
 
 export const revalidate = 30;
 
 export default async function Home() {
-  const [markets, stats, listing] = await Promise.all([
-    getMarkets(),
-    getProtocolStats(),
-    getTokenListing(),
-  ]);
+  const [markets, stats] = await Promise.all([getMarkets(), getProtocolStats()]);
   const priced = markets.filter((m) => m.price !== null);
   const longs = markets.filter((m) => m.side === "long");
 
@@ -41,12 +35,6 @@ export default async function Home() {
             <Button href="/earn" variant="ghost">
               Earn on USDG
             </Button>
-          </div>
-
-          {/* The address, or the honest absence of one. Placed here from the day before launch so
-              that the place is familiar before the thing is. */}
-          <div className="mt-8 w-full max-w-2xl">
-            <CaBanner address={listing.token} symbol={listing.symbol || "CLUBY"} />
           </div>
         </div>
 
