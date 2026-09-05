@@ -239,32 +239,60 @@ contract ProofLeverageCloseTest is Test {
     /// CLAIM: close() borrows the repayment from Morpho's own idle balance. When that balance is
     /// short — the ordinary state of a market at high utilisation — the only exit this contract
     /// offers is unavailable, however healthy the position is.
-    function test_proof_closeNeedsIdleLiquidityItCannotGuarantee() public {
-        uint256 price = _open();
+    /// `close()` funds the repayment with a flash loan, so it needs Morpho to be holding the loan
+    /// token at that moment. A fully drawn market has nothing idle to lend, and the close reverts
+    /// even though the position is perfectly healthy.
+    ///
+    /// This is a property of the route, not a defect in it, and it matters only because the way out
+    /// has to be stated: repaying directly needs no flash loan and no idle liquidity at all, which
+    /// is the path `packages/sdk/src/tx.ts` already builds. A leveraged position is never trapped;
+    /// it just cannot always be unwound in one transaction.
+    function test_closeNeedsIdleLiquidityAndDirectRepayDoesNot() public {
+        _open();
+        uint256 shares = MORPHO.position(NVDA_MARKET, user).borrowShares;
         uint256 quotedDebt = lens.userView(params, user, 0).borrowAssets;
 
-        // The lender takes their money back out. The position is untouched and perfectly healthy.
-        vm.prank(supplier);
-        MORPHO.withdraw(params, 49_000e6, 0, supplier, supplier);
-        // Drain what Morpho still holds so nothing is left to flash-borrow.
+        // A second borrower takes everything the market has idle. Nothing about the first position
+        // changed, and it is still healthy.
+        address hog = makeAddr("hog");
+        deal(Addresses.NVDA, hog, 5_000e18);
+        vm.startPrank(hog);
+        IERC20(Addresses.NVDA).approve(address(MORPHO), type(uint256).max);
+        MORPHO.supplyCollateral(params, 5_000e18, hog, "");
         uint256 idle = IERC20(Addresses.USDG).balanceOf(address(MORPHO));
-        vm.prank(address(MORPHO));
-        IERC20(Addresses.USDG).transfer(address(0xdead), idle > quotedDebt ? idle - quotedDebt / 2 : 0);
+        MORPHO.borrow(params, idle, 0, hog, hog);
+        vm.stopPrank();
 
-        assertGt(lens.userView(params, user, 0).healthFactorWad, 1e18, "position is healthy");
+        assertEq(IERC20(Addresses.USDG).balanceOf(address(MORPHO)), 0, "nothing left to flash-borrow");
+        assertGt(lens.userView(params, user, 0).healthFactorWad, 1e18, "and the position is healthy");
 
         vm.prank(user);
+        vm.expectRevert();
         leverage.close(
             LeverageRouter.CloseParams({
                 marketParams: params,
-                repayAmount: quotedDebt,
-                repayShares: 0,
-                collateralToSell: (((quotedDebt * ORACLE_SCALE) / price) * 106) / 100,
+                repayAmount: 0,
+                repayShares: shares,
+                collateralToSell: (((quotedDebt * ORACLE_SCALE) / IOracle(params.oracle).price()) * 106) / 100,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
                 onBehalf: user,
-                flashAmount: quotedDebt
+                flashAmount: (quotedDebt * 105) / 100
             })
         );
+
+        // The way out, with no flash loan involved: bring the loan token yourself and repay by
+        // shares. It lands on zero debt and the collateral comes back.
+        deal(Addresses.USDG, user, quotedDebt * 2);
+        vm.startPrank(user);
+        IERC20(Addresses.USDG).approve(address(MORPHO), type(uint256).max);
+        MORPHO.repay(params, 0, shares, user, "");
+        uint256 left = MORPHO.position(NVDA_MARKET, user).collateral;
+        MORPHO.withdrawCollateral(params, left, user, user);
+        vm.stopPrank();
+
+        Position memory p = MORPHO.position(NVDA_MARKET, user);
+        assertEq(p.borrowShares, 0, "direct repay clears the debt with no idle liquidity");
+        assertEq(p.collateral, 0, "and the collateral comes back");
     }
 }

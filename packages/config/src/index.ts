@@ -425,11 +425,14 @@ export const deployments: {
   markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
   /**
-   * Third Lens. The second (0x5FC2CD44…) divided by `collateral.wMulDown(lltv)` without checking it
-   * for zero, so one raw unit of an 18-decimal collateral panicked the read — and took every batch
-   * and every keeper pass that touched the market with it.
+   * Fourth Lens. The second (0x5FC2CD44…) divided by `collateral.wMulDown(lltv)` without checking
+   * it for zero, so one raw unit of an 18-decimal collateral panicked the read — and took every
+   * batch and every keeper pass that touched the market with it. The third (0x7148C4F9…) fixed
+   * that but published the borrow rate off the accrued struct, which reads the IRM's own stale
+   * rateAtTarget and skips the adaptation across the window: a rate half again too high on a
+   * market nobody had touched for a week.
    */
-  lens: "0x7148C4F98cA8a4752692C4926E11d2e36E6f066D",
+  lens: "0x6159fbBe4d521fd673A496948910791d7eec7B58",
   /**
    * Third liquidator. The first (0xDCc269c0…) collapsed the flash-loan size and the swap floor into
    * one number; the second (0x91B3c5b8…) measured solvency against the size of the flash loan
