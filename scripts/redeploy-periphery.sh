@@ -12,7 +12,11 @@ set -a; . ./.env; set +a
 RPC="${CLUBY_RPC_URL:-https://rpc.mainnet.chain.robinhood.com}"
 export ETH_RPC_URL="$RPC"
 OWNER="${OWNER:-0x90a82053b9012b6ea2D95f88ee81da969d4D8A85}"
-KEEPER="${KEEPER:-0xc2478f68115236642aA1d71b9c1a22c3665E781c}"
+# The keeper key lives only in /opt/cluby/.env on the VPS and is generated there, so this is the
+# address it derives to and nothing more. The previous one (0xc2478f68…) was lost when an
+# rsync --delete of the working tree removed the launcher script that carried it; the key is in
+# the env file now, which nothing execs and nothing syncs over.
+KEEPER="${KEEPER:-0x61b134A8d133802170093367c7241047158F33A0}"
 
 gas_price() { python3 -c "print(int($(cast base-fee) * 2))"; }
 

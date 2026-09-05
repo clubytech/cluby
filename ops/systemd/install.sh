@@ -3,7 +3,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Both live in the repo so a `rsync --delete` of the working tree cannot take them out from under
+# the units — which is exactly what happened once.
 install -m 755 alert-unit.sh /opt/cluby/alert-unit.sh
+install -m 755 run-keeper.sh /opt/cluby/run-keeper.sh
 install -m 644 cluby-alert@.service /etc/systemd/system/cluby-alert@.service
 
 for unit in cluby-keeper cluby-indexer; do
