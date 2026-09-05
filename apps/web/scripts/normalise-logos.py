@@ -82,6 +82,54 @@ def trim(img: Image.Image) -> Image.Image:
     return rgba.crop(box) if box else rgba
 
 
+def card_colour(mark: Image.Image) -> tuple[int, int, int, int] | None:
+    """The mark's own background, when the mark is a solid card rather than a shape.
+
+    SPCX ships as a black rectangle with SPACEX set across it. It is wider than it is tall, so it is
+    fitted rather than cropped, and fitted onto a white disc it reads as a black postage stamp
+    floating in a white ring — the exact "logo doesn't fill the circle" complaint. Nothing is wrong
+    with the mark; the ground is wrong. A card carries its own background, and using it makes the
+    disc continuous with the artwork instead of framing it.
+
+    Only claimed when the border really is one colour: a mark with a photograph or a gradient behind
+    it has no single background to borrow, and guessing one would tint the disc off the artwork.
+    """
+    rgba = mark.convert("RGBA")
+    px = rgba.load()
+    w, h = rgba.size
+    if w < 8 or h < 8:
+        return None
+
+    step = max(1, min(w, h) // 30)
+    edge = []
+    for x in range(0, w, step):
+        edge.append(px[x, 0])
+        edge.append(px[x, h - 1])
+    for y in range(0, h, step):
+        edge.append(px[0, y])
+        edge.append(px[w - 1, y])
+
+    opaque = [c for c in edge if c[3] > 250]
+    # A card has a border that is entirely there. Any transparency and this is a shape on nothing.
+    if len(opaque) < len(edge):
+        return None
+
+    # The median, and then how much of the border agrees with it.
+    #
+    # The first version of this asked whether the WIDEST deviation was small, and SpaceX's card
+    # failed it: the border is black everywhere and still varies by about thirty across a subtle
+    # gradient and its own antialiasing, so one pixel disqualified a card that is obviously a card.
+    # A median with a quorum answers the question actually being asked — is there a single colour
+    # behind this artwork — and is not decided by the worst pixel on the edge.
+    mid = tuple(sorted(c[i] for c in opaque)[len(opaque) // 2] for i in range(3))
+    near = sum(
+        1 for c in opaque if max(abs(c[0] - mid[0]), abs(c[1] - mid[1]), abs(c[2] - mid[2])) <= 40
+    )
+    if near / len(opaque) < 0.9:
+        return None
+    return (mid[0], mid[1], mid[2], 255)
+
+
 def ground_for(mark: Image.Image) -> tuple[int, int, int, int]:
     """The ground that hides less of this mark.
 
@@ -157,32 +205,55 @@ def normalise(path: Path, mask: Image.Image) -> str:
     w, h = max(1, round(mark.width * scale)), max(1, round(mark.height * scale))
     mark = mark.resize((w, h), Image.LANCZOS)
 
-    bg = ground_for(mark)
+    # A card's own background beats either of the two house colours: it makes the disc continuous
+    # with the artwork rather than framing it.
+    bg = card_colour(mark) or ground_for(mark)
     canvas = Image.new("RGBA", (SIZE, SIZE), bg)
     canvas.paste(mark, ((SIZE - w) // 2, (SIZE - h) // 2), mark)
     canvas.putalpha(mask)
     canvas.save(path, "PNG", optimize=True)
     how = "filled" if fills else "fitted"
-    ground = "dark" if bg == DARK_BG else "white"
+    ground = "dark" if bg == DARK_BG else "white" if bg == LIGHT_BG else f"card {bg[:3]}"
     return f"{src.width}x{src.height} -> {SIZE}x{SIZE}, {how}, {ground} ground"
 
 
 def contrast_of(path: Path) -> float:
-    """Share of pixels inside the disc that differ from the ground. Zero means invisible."""
+    """Share of pixels inside the disc that differ from the disc's own ground.
+
+    The first version of this asked how many pixels were DARK, which quietly assumed every disc was
+    a light one. It worked until a logo earned a dark ground: SpaceX's card is near-black across the
+    whole disc, so ninety-nine percent of it read as "ink" and the check called a perfectly legible
+    mark blank. The question is not how dark the disc is, it is whether anything on it stands out
+    from the rest of it — so the ground is measured from the image instead of assumed, and contrast
+    is counted against that.
+    """
     im = Image.open(path).convert("RGBA")
     px = im.load()
     w, h = im.size
     inset = w // 6
-    seen = dark = 0
+
+    def lum(c: tuple[int, int, int, int]) -> float:
+        return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+    seen = []
     for y in range(inset, h - inset, 3):
         for x in range(inset, w - inset, 3):
-            r, g, b, a = px[x, y]
-            if a < 200:
+            c = px[x, y]
+            if c[3] < 200:
                 continue
-            seen += 1
-            if 0.299 * r + 0.587 * g + 0.114 * b < 200:
-                dark += 1
-    return 0.0 if seen == 0 else dark / seen
+            seen.append(c)
+    if not seen:
+        return 0.0
+
+    # The ground is whatever colour most of the disc is. Quantised so antialiasing does not split
+    # one background into a hundred near-identical colours.
+    from collections import Counter
+
+    ground = Counter((c[0] // 16, c[1] // 16, c[2] // 16) for c in seen).most_common(1)[0][0]
+    gl = lum((ground[0] * 16 + 8, ground[1] * 16 + 8, ground[2] * 16 + 8, 255))
+
+    different = sum(1 for c in seen if abs(lum(c) - gl) > 40)
+    return different / len(seen)
 
 
 def main() -> int:

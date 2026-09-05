@@ -1,5 +1,5 @@
 """
-Draw the marks that no equity-logo API can supply.
+Draw the marks that no logo service can supply.
 
 WETH is Ether, not a listed company. Asking a US-equity logo service about it returns whatever its
 search matched — in our case a company called Wetouch, which shipped and looked entirely plausible
@@ -10,6 +10,23 @@ Ether's is a diamond of six flat facets, so it is drawn here rather than fetched
 licence question, exact geometry, and it comes out already matching the disc treatment the other
 logos get from `normalise-logos.py`.
 
+Two equities are here for a related reason, and it is worth writing down because "just fetch it"
+sounds like it should always work:
+
+  GLD is SPDR Gold Shares. Every source returns either a three-line text card — "SPDR Gold Shares /
+  an Exchange Traded Gold security" — or State Street's own stacked wordmark, and at the 36px this
+  renders at both are a grey smear. The State Street mark is also what SPY would carry, so the two
+  funds would become indistinguishable in the same list. What the fund actually IS reads instantly
+  at any size: a gold bar.
+
+  DJT is Trump Media. The equity service still ships Digital World Acquisition Corp's blue block —
+  the SPAC it merged out of in 2024 — which is not a poor logo, it is the wrong company's. A
+  lettermark of the company's own initials is correct, legible small, and cannot be out of date in
+  the way a stale brand asset is.
+
+Neither is a trademark reproduction: one is the metal, the other is four letters set in our own
+type. Both beat a confidently wrong mark, and both beat a placeholder.
+
 Run:  python3 apps/web/scripts/draw-crypto-logos.py
 """
 
@@ -18,7 +35,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).resolve().parent
 LOGOS = HERE.parent / "public" / "logos"
@@ -68,21 +85,81 @@ def disc(size: int, colour: tuple[int, int, int, int]) -> Image.Image:
     return out
 
 
+def gold_bar(size: int) -> Image.Image:
+    """A trapezoidal ingot, lit from the upper left. Three faces, no outline, no text."""
+    s = size * SS
+    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    TOP = (255, 224, 130, 255)
+    FRONT = (242, 185, 46, 255)
+    SIDE = (198, 140, 22, 255)
+
+    def p(x: float, y: float) -> tuple[float, float]:
+        return (x * s, y * s)
+
+    # The top face, a parallelogram seen at a shallow angle.
+    d.polygon([p(0.20, 0.40), p(0.68, 0.28), p(0.92, 0.40), p(0.44, 0.53)], fill=TOP)
+    # The front face, taller on the left where the bar is nearer.
+    d.polygon([p(0.20, 0.40), p(0.44, 0.53), p(0.44, 0.78), p(0.20, 0.65)], fill=SIDE)
+    # The long face.
+    d.polygon([p(0.44, 0.53), p(0.92, 0.40), p(0.92, 0.62), p(0.44, 0.78)], fill=FRONT)
+
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def lettermark(size: int, text: str, colour: tuple[int, int, int, int]) -> Image.Image:
+    """Four letters, as wide as they can be without touching the disc."""
+    s = size * SS
+    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    # A bundled face if one is there, the default bitmap font if not — the fallback is ugly but it
+    # never fails to render, and a build that dies on a missing font is worse than a plain one.
+    font = None
+    for candidate in (
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ):
+        if Path(candidate).exists():
+            try:
+                font = ImageFont.truetype(candidate, int(s * 0.30))
+                break
+            except OSError:
+                continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    box = d.textbbox((0, 0), text, font=font)
+    w, h = box[2] - box[0], box[3] - box[1]
+    d.text(((s - w) / 2 - box[0], (s - h) / 2 - box[1]), text, font=font, fill=colour)
+    return img.resize((size, size), Image.LANCZOS)
+
+
 def main() -> int:
     LOGOS.mkdir(parents=True, exist_ok=True)
 
-    # Same share of the canvas the fetched logos get, so it sits in the row without standing out.
+    # Same share of the canvas the fetched logos get, so these sit in the row without standing out.
     mark_px = int(SIZE * 0.62)
-    mark = ether(mark_px)
 
-    canvas = disc(SIZE, GROUND)
-    canvas.alpha_composite(mark, ((SIZE - mark_px) // 2, (SIZE - mark_px) // 2))
-    # Re-apply the disc mask: the mark is inside it, but compositing can touch the soft edge.
-    canvas.putalpha(Image.composite(canvas.getchannel("A"), canvas.getchannel("A"), disc(SIZE, GROUND).getchannel("A")))
+    drawn: list[tuple[str, Image.Image, tuple[int, int, int, int]]] = [
+        ("WETH", ether(mark_px), GROUND),
+        ("GLD", gold_bar(int(SIZE * 0.92)), (28, 30, 34, 255)),
+        ("DJT", lettermark(int(SIZE * 0.92), "TMTG", (36, 46, 120, 255)), GROUND),
+    ]
 
-    out = LOGOS / "WETH.png"
-    canvas.save(out, "PNG", optimize=True)
-    print(f"drew {out.name} at {SIZE}x{SIZE}")
+    for name, mark, ground in drawn:
+        canvas = disc(SIZE, ground)
+        px = mark.size[0]
+        canvas.alpha_composite(mark, ((SIZE - px) // 2, (SIZE - px) // 2))
+        # Re-apply the disc mask: the mark is inside it, but compositing can touch the soft edge.
+        canvas.putalpha(
+            Image.composite(canvas.getchannel("A"), canvas.getchannel("A"), disc(SIZE, ground).getchannel("A"))
+        )
+        out = LOGOS / f"{name}.png"
+        canvas.save(out, "PNG", optimize=True)
+        print(f"drew {out.name} at {SIZE}x{SIZE}")
     return 0
 
 

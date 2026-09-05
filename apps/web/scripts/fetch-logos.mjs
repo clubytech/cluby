@@ -34,6 +34,30 @@ const { marketCatalog } = await import("@cluby/config");
 const NOT_EQUITIES = new Set(["WETH", "PONS", "CASHCAT", "INDEX", "USDG"]);
 
 /**
+ * The chain's own tokens, from the one place that actually indexes this chain.
+ *
+ * These have no ticker any equity service has heard of, so they had no logo at all and fell back to
+ * a two-letter monogram — which is honest and also looks like a row of placeholders. DexScreener
+ * indexes Robinhood Chain (its pairs come back with `chainId: "robinhood"`) and hosts the artwork
+ * each project submitted, which is the same image their own traders see.
+ *
+ * The URLs are pinned rather than looked up at build time on purpose. The lookup API sits behind a
+ * bot check that a script cannot pass, and an image whose address can change under us is an image
+ * that can change into something else — so each was fetched once, LOOKED AT, and written down.
+ * Re-check them by hand rather than trusting a redirect:
+ *
+ *   https://api.dexscreener.com/latest/dex/tokens/<address>   → pairs[].info.imageUrl
+ */
+const CHAIN_NATIVE = {
+  // 0x39dBED3a2bd333467115dE45665cC57F813C4571 — the launchpad's own token: a silver P.
+  PONS: "https://cdn.dexscreener.com/cms/images/dkmXs8KYMyMXjuU1?width=800&height=800&quality=95&format=auto",
+  // 0x020bfC650A365f8BB26819deAAbF3E21291018b4 — the crying-cat meme, which is the whole brand.
+  CASHCAT: "https://cdn.dexscreener.com/cms/images/Lq7a3pS9Wn8EuGp0?width=800&height=800&quality=95&format=auto",
+  // 0x56910D4409F3a0C78C64DD8D0545FF0705389870 — four squares on a blue gradient.
+  INDEX: "https://cdn.dexscreener.com/cms/images/LTfdhAlnWijozhDa?width=800&height=800&quality=95&format=auto",
+};
+
+/**
  * Equities whose logo is a multi-line text card rather than a mark. Both of these are CORRECT — GLD
  * really does ship "SPDR Gold Shares / Exchange Traded Gold Security" set in three lines, and DJT
  * carries its predecessor's Digital World Acquisition Corp block — and both are an unreadable smear
@@ -45,6 +69,9 @@ const NOT_EQUITIES = new Set(["WETH", "PONS", "CASHCAT", "INDEX", "USDG"]);
  * "illegible" as well as looking does.
  */
 const TEXT_CARD_NOT_A_MARK = new Set(["GLD", "DJT"]);
+// Both are drawn instead, by `draw-crypto-logos.py`, for reasons that file explains: GLD's sources
+// are all unreadable text cards (and State Street's own mark would make it a twin of SPY), and
+// DJT's is still the SPAC it merged out of in 2024 — the wrong company, not a poor picture.
 
 const subjects = [...new Set(marketCatalog.map((m) => (m.side === "long" ? m.collateral : m.loan)))]
   .filter((s) => !NOT_EQUITIES.has(s) && !TEXT_CARD_NOT_A_MARK.has(s))
@@ -91,6 +118,26 @@ for (const t of subjects) {
   wrote.push(t);
 }
 
+// The chain's own tokens, from their own source.
+for (const [t, src] of Object.entries(CHAIN_NATIVE)) {
+  const file = join(OUT, `${t}.png`);
+  if (!FORCE && existsSync(file)) continue;
+  try {
+    const res = await fetch(src, {
+      signal: AbortSignal.timeout(20000),
+      // The CDN serves a script a plain image; the lookup API in front of it does not.
+      headers: { "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 400) throw new Error(`${buf.length} bytes, too small to be a logo`);
+    writeFileSync(file, buf);
+    wrote.push(t);
+  } catch (e) {
+    missing.push(`${t} (${e.message})`);
+  }
+}
+
 // Anything already on disk counts toward coverage.
 const have = new Set(readdirSync(OUT).filter((f) => f.endsWith(".png")).map((f) => f.slice(0, -4)));
 for (const f of readdirSync(OUT).filter((f) => f.endsWith(".png"))) {
@@ -100,5 +147,5 @@ for (const f of readdirSync(OUT).filter((f) => f.endsWith(".png"))) {
 console.log(`${subjects.length} tickers, ${have.size} with a logo on disk`);
 if (wrote.length) console.log(`  downloaded: ${wrote.join(" ")}`);
 if (duplicates.length) console.log(`  dropped as a shared placeholder: ${duplicates.join(", ")}`);
-const none = subjects.filter((t) => !have.has(t));
+const none = [...subjects, ...Object.keys(CHAIN_NATIVE)].filter((t) => !have.has(t));
 if (none.length) console.log(`  no logo, will fall back to the ticker chip: ${none.join(" ")}`);
