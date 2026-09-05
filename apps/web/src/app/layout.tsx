@@ -18,11 +18,25 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  // Absolute, so the Open Graph image and any canonical URL resolve against the real domain rather
+  // than against whichever preview deployment happens to render them.
+  metadataBase: new URL("https://cluby.cash"),
   title: "Cluby — credit against tokenized stocks",
   description:
     "Borrow USDG against tokenized NVDA, SPY, AAPL and ETH. Isolated markets curated on Morpho Blue, on Robinhood Chain.",
   icons: { icon: "/cluby-logo.png" },
+  alternates: { canonical: "/" },
   openGraph: {
+    type: "website",
+    siteName: "Cluby",
+    url: "https://cluby.cash",
+    title: "Cluby — credit against tokenized stocks",
+    description:
+      "Borrow USDG against tokenized stocks. Isolated Morpho Blue markets, Chainlink oracles, zero performance fee.",
+    images: ["/cluby-banner.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
     title: "Cluby — credit against tokenized stocks",
     description:
       "Borrow USDG against tokenized stocks. Isolated Morpho Blue markets, Chainlink oracles, zero performance fee.",
