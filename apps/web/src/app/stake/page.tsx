@@ -26,7 +26,7 @@ export default async function StakePage() {
           <Card className="border border-line bg-white">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[26px]">Staking</h2>
+                <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[26px] font-semibold">Staking</h2>
                 <p className="mt-2 max-w-md text-sm text-text-soft">
                   Deposit the protocol token, claim USDG whenever you like. Withdrawals are immediate.
                 </p>
@@ -64,7 +64,7 @@ export default async function StakePage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
-              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Where the rewards come from</h3>
+              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Where the rewards come from</h3>
               <div className="mt-5 flex flex-col gap-3 text-sm">
                 {[
                   ["Performance fee on vault interest", pct(e.performanceFee, 0)],
@@ -86,7 +86,7 @@ export default async function StakePage() {
             </Card>
 
             <Card>
-              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Borrower rebates</h3>
+              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Borrower rebates</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Borrowers get {pct(e.borrowRebate, 0)} of the interest they paid back through a weekly
                 Merkle epoch. You claim it yourself; unclaimed amounts roll into the next epoch. It is

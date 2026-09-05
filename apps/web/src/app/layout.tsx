@@ -5,11 +5,14 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
+// Inter is variable, so every weight between 100 and 900 is already in the one file: asking for
+// specific ones would download more, not fewer.
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const serif = IBM_Plex_Serif({
   variable: "--font-ibm-plex-serif",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  // 700 for the two places a headline has to carry the page on its own.
+  weight: ["400", "500", "600", "700"],
 });
 const mono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",

@@ -24,7 +24,7 @@ export default async function StatsPage() {
             ].map(([l, v]) => (
               <div key={l}>
                 <p className="text-[11px] uppercase tracking-widest text-white/50">{l}</p>
-                <p className="num mt-2 text-2xl">{v}</p>
+                <p className="num mt-2 text-2xl font-medium">{v}</p>
               </div>
             ))}
           </div>
@@ -37,7 +37,7 @@ export default async function StatsPage() {
 
       <section className="bg-white">
         <div className="container-padding section-y flex flex-col gap-8">
-          <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px]">Oracle feeds</h2>
+          <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px] font-semibold">Oracle feeds</h2>
           <div className="overflow-x-auto rounded-[28px] border border-line">
             <table className="w-full min-w-[720px] text-left">
               <thead>
@@ -78,7 +78,7 @@ export default async function StatsPage() {
       <section className="bg-bg-weak/60">
         <div className="container-padding section-y grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="bg-white">
-            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Risk tiers</h2>
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Risk tiers</h2>
             <div className="mt-6 flex flex-col gap-3 text-sm">
               {Object.entries(stats.lltvTiers).map(([tier, value]) => (
                 <div key={tier} className="flex justify-between border-b border-line pb-3 last:border-0">
@@ -90,7 +90,7 @@ export default async function StatsPage() {
           </Card>
 
           <Card className="bg-white">
-            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Short interest</h2>
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Short interest</h2>
             {shorts.length === 0 ? (
               <p className="mt-4 text-sm text-text-soft">No short markets yet.</p>
             ) : (

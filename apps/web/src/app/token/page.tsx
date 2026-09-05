@@ -86,7 +86,7 @@ export default async function TokenPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,43,56,0.5)]">
               <p className="num text-[11px] uppercase tracking-widest text-text-soft">Borrower rebate</p>
-              <p className="num mt-3 text-3xl">{pct(e.borrowRebate, 0)}</p>
+              <p className="num mt-3 text-3xl font-medium">{pct(e.borrowRebate, 0)}</p>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Of the interest a borrower pays comes back to them weekly, through a Merkle epoch,
                 weighted by an off-chain credit score. The score can move what you are paid. It can
@@ -98,7 +98,7 @@ export default async function TokenPage() {
 
             <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,43,56,0.5)]">
               <p className="num text-[11px] uppercase tracking-widest text-text-soft">Builder share</p>
-              <p className="num mt-3 text-3xl">{pct(e.builderShare, 0)}</p>
+              <p className="num mt-3 text-3xl font-medium">{pct(e.builderShare, 0)}</p>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Of the performance fee on volume a builder referred goes to that builder. Attribution
                 rides in a calldata suffix, so an integrator needs no permission and no contract of
@@ -112,7 +112,7 @@ export default async function TokenPage() {
 
             <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,43,56,0.5)]">
               <p className="num text-[11px] uppercase tracking-widest text-text-soft">Flash loan fee</p>
-              <p className="num mt-3 text-3xl">{pct(e.flashLoanFee, 0)}</p>
+              <p className="num mt-3 text-3xl font-medium">{pct(e.flashLoanFee, 0)}</p>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Morpho charges nothing for a flash loan and neither do we. It is what makes a
                 liquidation possible with no capital, which is what keeps liquidations prompt and
@@ -136,7 +136,7 @@ export default async function TokenPage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card className="bg-white">
-              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Governable</h3>
+              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Governable</h3>
               <ul className="mt-5 flex flex-col gap-4 text-sm leading-relaxed text-text-soft">
                 <li>
                   <span className="text-text-strong">Which markets a vault may lend into,</span> and
@@ -159,7 +159,7 @@ export default async function TokenPage() {
             </Card>
 
             <Card className="bg-white">
-              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Not governable, by construction</h3>
+              <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Not governable, by construction</h3>
               <ul className="mt-5 flex flex-col gap-4 text-sm leading-relaxed text-text-soft">
                 <li>
                   <span className="text-text-strong">Your deposit and your collateral.</span> They sit
@@ -221,7 +221,7 @@ export default async function TokenPage() {
           </Card>
 
           <Card className="bg-bg-weak">
-            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">
+            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">
               What a fee actually looks like at today&apos;s size
             </h3>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-text-soft">

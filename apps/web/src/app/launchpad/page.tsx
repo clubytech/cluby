@@ -51,7 +51,7 @@ export default async function LaunchpadPage() {
       <section className="bg-bg-weak/60">
         <div className="container-padding section-y flex flex-col gap-6">
           <Card className="bg-white">
-            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">What is already here</h2>
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">What is already here</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               Nothing about the launchpad needs new lending machinery — the parts it would use are
               running. Markets on pool-priced tokens exist today: PONS and CASHCAT are live at{" "}

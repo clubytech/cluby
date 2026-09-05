@@ -47,7 +47,7 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
             <span className="group inline-flex">
               <MarketLogo subject={market.subject} size={56} />
             </span>
-            <h1 className="font-[family-name:var(--font-ibm-plex-serif)] text-[36px] md:text-[48px]">
+            <h1 className="font-[family-name:var(--font-ibm-plex-serif)] text-[36px] font-semibold md:text-[48px]">
               {isShort ? `Short ${market.subject}` : `${market.collateralSymbol} / ${market.loanSymbol}`}
             </h1>
             <Badge tone={market.status === "listed" ? "live" : market.status === "planned" ? "pending" : "neutral"}>
@@ -113,7 +113,7 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
 
             {market.status === "listed" && (
               <Card className="bg-bg-weak">
-                <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">
+                <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">
                   You can take your place before the money arrives
                 </h2>
                 <p className="mt-4 text-sm leading-relaxed text-text-soft">
@@ -135,7 +135,7 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
             )}
 
             <Card className="bg-bg-weak">
-              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Info &amp; risk</h2>
+              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Info &amp; risk</h2>
               <dl className="mt-6 flex flex-col gap-4 text-sm">
                 {[
                   ["Collateral", isShort ? `${market.collateralSymbol} (you post cash)` : market.collateralSymbol],
@@ -166,7 +166,7 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
             </Card>
 
             <Card className="bg-bg-weak">
-              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">
+              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">
                 {isShort ? "How a short works here" : "What liquidation means here"}
               </h2>
               <p className="mt-4 text-sm leading-relaxed text-text-soft">

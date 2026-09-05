@@ -66,7 +66,7 @@ export function RateCurve({
   return (
     <div className="rounded-2xl border border-line bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">What the rate does as the pool fills</h3>
+        <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">What the rate does as the pool fills</h3>
         <span className="num text-[11px] uppercase tracking-widest text-text-soft">at today&apos;s curve</span>
       </div>
 

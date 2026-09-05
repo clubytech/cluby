@@ -21,7 +21,7 @@ export default async function Home() {
           <p className="num mb-6 rounded-full border border-white/20 px-4 py-1.5 text-[11px] uppercase tracking-widest text-white/80">
             Curated on Morpho Blue · Robinhood Chain
           </p>
-          <h1 className="font-[family-name:var(--font-ibm-plex-serif)] text-[42px] leading-[1.05] tracking-tight text-white md:text-[56px] xl:text-[84px]">
+          <h1 className="font-[family-name:var(--font-ibm-plex-serif)] text-[42px] font-semibold leading-[1.05] tracking-tight text-white md:text-[56px] xl:text-[84px]">
             Your stocks stay yours.
             <br />
             The liquidity is new.
@@ -64,11 +64,11 @@ export default async function Home() {
                 <p className="num text-[11px] uppercase tracking-widest text-text-soft">01 — Supply</p>
                 <p className="num text-[11px] uppercase tracking-widest text-text-soft">earning now</p>
               </div>
-              <p className="num mt-4 text-[40px] leading-none text-brand transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
+              <p className="num mt-4 text-[40px] font-semibold leading-none text-brand transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
                 {stats.economics.introFee === 0 ? pct(0, 0) : pct(stats.economics.performanceFee, 0)}
                 <span className="ml-2 text-[13px] text-text-soft">fee on your yield</span>
               </p>
-              <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Lend USDG</h3>
+              <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Lend USDG</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Deposit into the Core vault. It spreads liquidity across the four markets under caps
                 you can read on chain, and you withdraw whatever is not currently borrowed.
@@ -79,11 +79,11 @@ export default async function Home() {
                 <p className="num text-[11px] uppercase tracking-widest text-text-soft">02 — Collateralise</p>
                 <p className="num text-[11px] uppercase tracking-widest text-text-soft">accepted</p>
               </div>
-              <p className="num mt-4 text-[40px] leading-none text-brand transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
+              <p className="num mt-4 text-[40px] font-semibold leading-none text-brand transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
                 {longs.length}
                 <span className="ml-2 text-[13px] text-text-soft">collaterals</span>
               </p>
-              <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Post your shares</h3>
+              <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Post your shares</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Tokenized NVDA, SPY, AAPL and ETH are accepted. Collateral never leaves Morpho Blue —
                 Cluby has no contract that can hold it between transactions.
@@ -94,11 +94,11 @@ export default async function Home() {
                 <p className="num text-[11px] uppercase tracking-widest text-text-soft">03 — Borrow</p>
                 <p className="num text-[11px] uppercase tracking-widest text-text-soft">up to</p>
               </div>
-              <p className="num mt-4 text-[40px] leading-none text-brand transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
+              <p className="num mt-4 text-[40px] font-semibold leading-none text-brand transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
                 {pct(0.575, 1)}
                 <span className="ml-2 text-[13px] text-text-soft">of collateral value</span>
               </p>
-              <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Take USDG out</h3>
+              <h3 className="mt-3 font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Take USDG out</h3>
               <p className="mt-3 text-sm leading-relaxed text-text-soft">
                 Up to {pct(0.575, 1)} of collateral value on stock markets, with the liquidation price
                 shown before you sign. Repay any time; interest accrues by the second.

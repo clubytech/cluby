@@ -38,7 +38,7 @@ export function SectionHeading({
   return (
     <div className={`flex flex-col gap-3 md:gap-4 ${align === "center" ? "items-center" : ""}`}>
       <h2
-        className={`font-[family-name:var(--font-ibm-plex-serif)] text-[32px] font-normal leading-tight tracking-tight md:text-[36px] lg:text-[48px] ${alignment}`}
+        className={`font-[family-name:var(--font-ibm-plex-serif)] text-[32px] font-semibold leading-tight tracking-tight md:text-[36px] lg:text-[48px] ${alignment}`}
       >
         {title}
       </h2>
@@ -66,7 +66,7 @@ export function Stat({ label, value, sub }: { label: string; value: string; sub?
       <p className="text-[11px] uppercase tracking-widest text-text-soft transition-colors duration-200 group-hover:text-brand">
         {label}
       </p>
-      <p className="num text-[28px] leading-none text-text-strong transition-transform duration-250 ease-out group-hover:-translate-y-0.5">
+      <p className="num text-[28px] font-medium leading-none text-text-strong transition-transform duration-250 ease-out group-hover:-translate-y-0.5">
         {value}
       </p>
       {sub && <p className="text-xs text-text-soft">{sub}</p>}

@@ -803,7 +803,7 @@ function Doc({
   return (
     <section id={id} className="scroll-mt-32">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px]">{title}</h2>
+        <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[28px] font-semibold">{title}</h2>
         {badge && (
           <span className="num rounded-full bg-brand-bright/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-brand">
             {badge}

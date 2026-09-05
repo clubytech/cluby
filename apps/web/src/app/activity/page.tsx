@@ -144,7 +144,7 @@ export default async function ActivityPage() {
           )}
 
           <Card>
-            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Why this page exists</h3>
+            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Why this page exists</h3>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               A young protocol asks you to believe numbers it prints about itself. This is the cheapest
               way out of that: the same events, unaggregated, with the transaction hash next to each

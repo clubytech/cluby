@@ -53,10 +53,10 @@ export default async function EarnPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card className="border border-line bg-white">
               <div className="flex items-center gap-3">
-                <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">The exit is not locked</h3>
+                <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">The exit is not locked</h3>
                 <Badge tone="live">No lockup</Badge>
               </div>
-              <p className="num mt-4 text-3xl">{usd(totalWithdrawable)}</p>
+              <p className="num mt-4 text-3xl font-medium">{usd(totalWithdrawable)}</p>
               <p className="mt-1 text-sm text-text-soft">
                 withdrawable this second, out of {usd(totalAssets)} supplied
               </p>
@@ -70,10 +70,10 @@ export default async function EarnPage() {
 
             <Card className="border border-line bg-white">
               <div className="flex items-center gap-3">
-                <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Demand already at the door</h3>
+                <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Demand already at the door</h3>
                 {waiting === null && <Badge>Indexer offline</Badge>}
               </div>
-              <p className="num mt-4 text-3xl">{waiting === null ? "—" : usd(waitingUsd)}</p>
+              <p className="num mt-4 text-3xl font-medium">{waiting === null ? "—" : usd(waitingUsd)}</p>
               <p className="mt-1 text-sm text-text-soft">
                 {waiting === null
                   ? "unavailable right now"
@@ -102,7 +102,7 @@ export default async function EarnPage() {
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-lg">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[26px]">{v.name}</h2>
+                    <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[26px] font-semibold">{v.name}</h2>
                     <Badge tone={v.status === "listed" ? "live" : "pending"}>
                       {v.status === "listed" ? "Live" : "Not deployed"}
                     </Badge>
@@ -172,7 +172,7 @@ export default async function EarnPage() {
           ))}
 
           <Card>
-            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Partner vaults</h3>
+            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Partner vaults</h3>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               A project that wants its own token to be borrowable can have a vault of its own: one
               market, a cap it sets, and liquidity it deposits. The borrow demand is then its users&apos;,
@@ -181,7 +181,7 @@ export default async function EarnPage() {
           </Card>
 
           <Card>
-            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px]">Where the yield comes from</h3>
+            <h3 className="font-[family-name:var(--font-ibm-plex-serif)] text-[22px] font-semibold">Where the yield comes from</h3>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               Borrowers pay a rate set by Morpho&apos;s adaptive curve, which climbs as a market is used
               up and falls when it sits idle. Suppliers receive that interest in proportion to how much

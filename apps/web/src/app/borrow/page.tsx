@@ -33,7 +33,7 @@ export default async function BorrowPage() {
                 <p className="text-[11px] uppercase tracking-widest text-white/50 transition-colors duration-300 group-hover:text-brand-bright">
                   {l}
                 </p>
-                <p className="num mt-2 text-2xl transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
+                <p className="num mt-2 text-2xl font-medium transition-transform duration-300 ease-out group-hover:-translate-y-0.5">
                   {v}
                 </p>
                 <p className="mt-1 text-[11px] leading-snug text-white/40">{note}</p>

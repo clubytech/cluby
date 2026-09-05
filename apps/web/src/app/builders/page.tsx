@@ -50,7 +50,7 @@ export default async function BuildersPage() {
       <section className="bg-bg-weak/60">
         <div className="container-padding section-y flex flex-col gap-6">
           <Card className="bg-white">
-            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Attribution</h2>
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Attribution</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               A builder&apos;s address rides along as twenty bytes appended to the call. Solidity
               ignores bytes past the arguments it expects, so it reaches the chain, costs only
@@ -92,7 +92,7 @@ export default async function BuildersPage() {
           </Card>
 
           <Card className="bg-white">
-            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Free flash loans</h2>
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Free flash loans</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               Morpho lends any asset it holds for the length of one transaction at zero fee. Liquidators,
               arbitrage bots and leverage routers all run on it, including ours. Call{" "}
@@ -103,7 +103,7 @@ export default async function BuildersPage() {
             </p>
           </Card>
           <Card className="bg-white">
-            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">An MCP server</h2>
+            <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">An MCP server</h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-soft">
               The same SDK the site uses is exposed over MCP, so an agent can read markets and
               positions and build transactions without a browser. It ships alongside the public API.

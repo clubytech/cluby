@@ -42,7 +42,7 @@ export default async function PortfolioPage({
         <div className="container-padding section-y flex flex-col gap-6">
           {!valid && (
             <Card className="border border-line bg-white text-center">
-              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">
+              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">
                 Paste an address, or connect a wallet later
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-text-soft">
@@ -54,7 +54,7 @@ export default async function PortfolioPage({
 
           {portfolio && portfolio.vaults.length === 0 && portfolio.positions.length === 0 && (
             <Card className="border border-line bg-white text-center">
-              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Nothing here yet</h2>
+              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Nothing here yet</h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-text-soft">
                 This address has no deposit and no loan on any Cluby market.
               </p>
@@ -63,7 +63,7 @@ export default async function PortfolioPage({
 
           {portfolio && portfolio.vaults.length > 0 && (
             <Card className="border border-line bg-white">
-              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Deposits</h2>
+              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Deposits</h2>
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full min-w-[560px] text-left">
                   <thead>
@@ -91,7 +91,7 @@ export default async function PortfolioPage({
 
           {portfolio && portfolio.positions.length > 0 && (
             <Card className="border border-line bg-white">
-              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px]">Loans</h2>
+              <h2 className="font-[family-name:var(--font-ibm-plex-serif)] text-[24px] font-semibold">Loans</h2>
               <div className="mt-6 flex flex-col gap-4">
                 {portfolio.positions.map((p) => (
                   <div key={p.market} className="rounded-2xl border border-line p-5">
@@ -146,11 +146,11 @@ export default async function PortfolioPage({
                 <>
                   <div className="mt-3 flex gap-8">
                     <div>
-                      <p className="num text-2xl">{points.supplyPoints.toFixed(2)}</p>
+                      <p className="num text-2xl font-medium">{points.supplyPoints.toFixed(2)}</p>
                       <p className="text-xs text-text-soft">supplying</p>
                     </div>
                     <div>
-                      <p className="num text-2xl">{points.borrowPoints.toFixed(2)}</p>
+                      <p className="num text-2xl font-medium">{points.borrowPoints.toFixed(2)}</p>
                       <p className="text-xs text-text-soft">borrowing</p>
                     </div>
                   </div>
