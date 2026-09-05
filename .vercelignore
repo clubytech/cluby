@@ -1,0 +1,10 @@
+# Only the web app is built here. Everything else is either operational state that has no business
+# on a CDN, or build output that would be uploaded and then ignored.
+contracts/
+apps/keeper/
+apps/indexer/
+apps/mcp/
+ops/
+docs/audit/
+*.keeper-state.json
+.keeper-state.json
