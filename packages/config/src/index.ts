@@ -51,6 +51,8 @@ export const stocks = {
   },
   AAPL: {
     address: "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+    /** One token is 1.000566080061092436 shares. Read on chain 2026-09-05. */
+    uiMultiplier: 1_000_566_080_061_092_436n,
     feed: "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
     feedAggregator: "0xBb11A21267cFDb63d4935d99a499133DD1744ACb",
     usdgPool: { address: "0xAae0d815EE56e4092a5E5C2911E676Fea50B2d6D", fee: 500 },
@@ -77,7 +79,12 @@ export const stocks = {
     address: "0xD5f3879160bc7c32ebb4dC785F8a4F505888de68",
     feed: "0x80901d846d5D7B030F26B480776EE3b29374C2ae",
     feedAggregator: undefined,
-    // The deeper fee-500 pool only carries cardinality 300; the 3000 pool is the safer TWAP source.
+    // `usdgPool` is the EXIT -- where a liquidator sells -- so it is the deepest one, and for QQQ
+    // that is fee-500 at $988,577. It is deliberately NOT the same choice a TWAP source would make:
+    // this pool carries cardinality 300, while fee-3000 (0xEbD78dcfc8a6b3A696f1E191aD1ff321f9579f79)
+    // carries 1500 on only $42,450. QQQ is priced by Chainlink, so nothing depends on that today --
+    // but if it ever moves to a pool-based oracle, the source and the exit are two separate picks
+    // and this field answers only the second. An earlier comment here conflated them.
     usdgPool: { address: "0xd60a5d14db690b7afad71f76b108071d7175597d", fee: 500, cardinality: 300 },
     name: "Invesco QQQ Trust",
     exchange: "Nasdaq",
@@ -114,8 +121,9 @@ export const stocks = {
     name: "iShares 0-3 Month Treasury Bond ETF",
     exchange: "NYSE Arca",
     /**
-     * The only token whose uiMultiplier is not 1: 1.005101770003214918, already effective.
-     * Any oracle for SGOV has to carry it, or the collateral is undervalued by half a percent.
+     * Not the only token whose multiplier is not 1 -- a census of all 203 found twelve -- but the
+     * largest among what we list, and the only one that GROWS, because the fund accrues. Any oracle
+     * for SGOV has to carry it, or the collateral is undervalued by half a percent and rising.
      */
     uiMultiplier: 1_005_101_770_003_214_918n,
   },
@@ -149,6 +157,8 @@ export const stocks = {
   },
   DELL: {
     address: "0x941AE714EC6D8130c7B75d67160Ca08f1e7d11Dd",
+    /** One token is 1.000063708620124549 shares. Read on chain 2026-09-05. */
+    uiMultiplier: 1_000_063_708_620_124_549n,
     feed: "0x1C6c8cADBe02E19129c39dDB92281cE4c0bf206b",
     feedAggregator: "0xD6ed4e7D4ABA1111EB42A349899b5c72EE1C9FEF",
     usdgPool: { address: "0xc30c89cB7815A1488b7998D15eEC73961707Fc5a", fee: 10000, cardinality: 1500 },
@@ -181,6 +191,8 @@ export const stocks = {
   },
   MU: {
     address: "0xfF080c8ce2E5feadaCa0Da81314Ae59D232d4afD",
+    /** One token is 1.000074823219171086 shares. Read on chain 2026-09-05. */
+    uiMultiplier: 1_000_074_823_219_171_086n,
     feed: "0x425EEFdCf05ed6526C3cE61Af99429A228a6d596",
     feedAggregator: "0xA088FaD0A0A62693aF068E2EdB80B1578c8A9365",
     usdgPool: { address: "0xd057B1Bc54917855BBee58eAd58647f47caB35E5", fee: 3000, cardinality: 1801 },
@@ -213,6 +225,8 @@ export const stocks = {
   },
   ASML: {
     address: "0x47F93d52cBeC7C6D2CfC080e154002370a60dAEA",
+    /** One token is 1.000101323251417769 shares. Read on chain 2026-09-05. */
+    uiMultiplier: 1_000_101_323_251_417_769n,
     feed: "0xB4106147E8cce40b7d46124090d373A71b70f87D",
     feedAggregator: "0xF795030a46ad6CA4b07Bf5fB704dC36039118c9F",
     usdgPool: { address: "0xce79c1B7b5f9Ae1aab3B1796e7Fcd2F5F24cF265", fee: 3000, cardinality: 1 },
@@ -293,6 +307,8 @@ export const stocks = {
   },
   COST: {
     address: "0x4EA005168D7F09a7A0Ba9D1DEf21a479950E44C2",
+    /** One token is 1.000612040296259656 shares. Read on chain 2026-09-05. */
+    uiMultiplier: 1_000_612_040_296_259_656n,
     feed: undefined,
     feedAggregator: undefined,
     usdgPool: { address: "0x0a2121A50A09eD0796ae81F9c53fF9398355a398", fee: 3000, cardinality: 1801 },
@@ -387,6 +403,19 @@ export const stockTokenIdentity = {
   implementation: "Stock",
   /** Selector that must not revert: uiMultiplier(). Weaker than the beacon, and it agrees with it. */
   marker: "0xa60bf13d",
+  /**
+   * And the value it returns is NOT always 1, which was believed until a census read all 203.
+   * Twelve carry a different one; six of those are markets we have listed, and they are annotated
+   * in `stocks` above.
+   *
+   * Which way it cuts depends on the oracle. A Chainlink feed prices ONE SHARE, so a token worth
+   * 1.0051 shares is valued at 1/1.0051 of what it is really worth — the collateral is understated
+   * and the borrower may borrow slightly less than they should. That is the safe direction, and it
+   * is why this has not hurt anyone. But it is not static: SGOV accrues, so its gap widens, and the
+   * multiplier has to be composed into the oracle before its cap is raised to anything that matters.
+   * A TWAP prices the TOKEN and therefore carries the multiplier for free.
+   */
+  multiplierIsNotAlwaysOne: true,
   knownImpostors: [
     "0xd6a1232c3403dCaaE4f65Dc76Ee3C40528A51D2B", // fake SPCX, a CurvePumpToken
   ],
@@ -547,7 +576,7 @@ export const marketCatalog: MarketDef[] = [
   { key: "DJT", side: "long", collateral: "DJT", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 2000, status: "planned", note: "Priced by a 30-minute TWAP; the pool ring is 1400 slots and has to reach 1,800 before the oracle will build." },
   { key: "GLD", side: "long", collateral: "GLD", loan: "USDG", tier: "longTail", oracle: "twap", category: "ETF", supplyCapUsd: 25000, status: "planned", note: "Priced by a 30-minute TWAP; the pool ring is 1400 slots and has to reach 1,800 before the oracle will build." },
   { key: "COST", side: "long", collateral: "COST", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 2000, status: "listed" },
-  { key: "NFLX", side: "long", collateral: "NFLX", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 1000, status: "planned" },
+  { key: "NFLX", side: "long", collateral: "NFLX", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 1000, status: "listed" },
   { key: "MRNA", side: "long", collateral: "MRNA", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 500, status: "planned", note: "Priced by a 30-minute TWAP; the pool ring is 1400 slots and has to reach 1,800 before the oracle will build." },
   { key: "RIVN", side: "long", collateral: "RIVN", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 1000, status: "planned", note: "Priced by a 30-minute TWAP; the pool ring is 1400 slots and has to reach 1,800 before the oracle will build." },
   { key: "RBLX", side: "long", collateral: "RBLX", loan: "USDG", tier: "longTail", oracle: "twap", category: "Stocks", supplyCapUsd: 1000, status: "planned", note: "Priced by a 30-minute TWAP; the pool ring is 1400 slots and has to reach 1,800 before the oracle will build." },
@@ -766,6 +795,7 @@ export const deployments: {
     // Census listings, 2026-09-05. Ids recovered from the broadcast receipts and each one
     // confirmed against `idToMarketParams` -- the simulation printed different addresses, as it
     // has before, so the chain is the only source that counts here.
+    "NFLX": { id: "0x892a0adf84e7e752d8ad2ad61c9248dcc9657e41c6c7f7b94267491e60f0b382", oracle: "0x66e5Da27b5f095394891B6d5dEe1c33ca3987B06" },
     "AMD": { id: "0xe7c12d71f0ed01cd910ecbff6624737d2ef42f461e6c7e54b9c1d550f3865349", oracle: "0x75bBEAD4761D663C58097858ea72596574a5C160" },
     "ASML": { id: "0xd3926328455494296c5c484d5f7e169600c67c7c6443047adf8203f9b182235f", oracle: "0x1e92a0c8a5f2F934f02180050b64ECE689ab23b3" },
     "BABA": { id: "0x87479686089ea04b0ad36aaec410aa157401c05d26729a097b39e7b56ceeba46", oracle: "0x17E41f66223f35439D60dE7D71Dac657fBC5526e" },

@@ -103,15 +103,29 @@ The vault factory (MetaMorpho V1.1 / Vault V2), Bundler3, PreLiquidationFactory 
 are **not** at their Ethereum or Base addresses here — probed, all empty. A vault therefore needs our
 own deploy of the MetaMorpho V1.1 factory from Morpho sources.
 
-### Ticker squatting: symbol proves nothing
-Blockscout returns 30+ tokens per ticker. The real tokenized stocks answer `uiMultiplier()`
-(selector `0xa60bf13d`); the impostors revert on it. Verified against a fake SPCX at
-`0xd6a1232c3403dCaaE4f65Dc76Ee3C40528A51D2B`, which decodes the identical name and is a
-`CurvePumpToken`. All real stock tokens come from deployer
-`0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046`, implementation `Stock`.
+### Ticker squatting is worse than 30 per ticker, and the beacon is the answer
+Reading `symbol()` across every USDG counterparty on both Uniswap versions — 4,416 on v3 and 57,923
+on v4 — finds **257 tokens called PONS**, 93 CASHCAT, 81 AI, 29 NOTHING, 23 INDEX. Only one of each
+holds any money.
 
-**SGOV is the only token whose `uiMultiplier` is not 1**: `1.005101770003214918`, already effective.
-Any oracle for it has to carry the multiplier or the collateral is undervalued by half a percent.
+For a tokenized stock the question is settled outright, and not by `uiMultiplier()`. Every real one
+is a `BeaconProxy` whose ERC-1967 beacon slot
+(`0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50`) holds
+`0xe10b6f6b275De231345C20d14aB812dB62151b00`. Scanning `BeaconUpgraded` for that beacon
+**enumerates** the population — 203 tokens, no duplicate symbols, byte-identical runtime code — so a
+squatter cannot appear in it and a real token cannot be missed. Checking the slot on a candidate is
+the whole verification.
+
+`uiMultiplier()` (selector `0xa60bf13d`) still works as a weaker check and agrees with the beacon on
+all 203; the fake SPCX at `0xd6a1232c3403dCaaE4f65Dc76Ee3C40528A51D2B` reverts on it and carries no
+beacon. But **`0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046` is not a deployer** despite being recorded
+as one: it is itself an ERC-1967 proxy, and computing CREATE addresses from its nonces 1…210 yields
+zero live contracts. It cannot enumerate and it cannot check.
+
+**Twelve tokens carry a `uiMultiplier` other than 1, not one.** An earlier version of this file said
+SGOV was the only one while its own table three sections above recorded AAPL at 1.000566. The full
+list, largest first: CRWD 4.0, WEEK 2.0062, CCL 1.0215, SGOV 1.0051, ORCL 1.0022, UPS 1.0022,
+COST 1.00061, AAPL 1.00057, F 1.00015, ASML 1.00010, MU 1.000075, DELL 1.000064.
 
 ### Feeds
 Every Chainlink description resolves through **two** proxy addresses to the same aggregator: same
@@ -155,11 +169,19 @@ the short market's own decimals to Morpho's factory inverts them a second time a
 10^24 too small — `4.32e21` instead of `4.32e45` for NVDA at $231.46 — which still looks like a
 price and would silently misprice every position. Pinned by `test_shortOracleMagnitude`.
 
-### SGOV's uiMultiplier is not in the oracle path
-Morpho's Chainlink factory prices the feed, not the token, so SGOV's `uiMultiplier` of 1.0051 is not
-applied: the market values the collateral at the bare feed price, about 0.5% below what the token
-is actually worth. That is the safe direction — collateral is understated, never overstated — but
-the gap grows as the multiplier does, so it needs a composed oracle before SGOV's cap is raised.
+### A `uiMultiplier` is not in the Chainlink oracle path — and SGOV is not the only one affected
+Morpho's Chainlink factory prices the FEED, which quotes one share, not the TOKEN, which may be
+worth more than one. So the multiplier is dropped: the market values the collateral below what it is
+worth. That is the safe direction — understated, never overstated — but it is not free.
+
+Of the markets listed today, five are Chainlink-priced with a multiplier above 1: SGOV 0.51%,
+COST 0.061% (TWAP-priced, so unaffected), AAPL 0.057%, ASML 0.010%, MU 0.0075%, DELL 0.0064%. Only
+SGOV's is material, and only SGOV's GROWS, because the fund accrues. A composed oracle is needed
+before its cap is raised to anything that matters; the rest are noise for now and worth re-reading
+before they are not.
+
+A TWAP prices the token itself and therefore carries the multiplier for free. That is a real
+argument for the pool-based path on any token whose multiplier drifts.
 
 ### The RPC returns wrong answers under load, silently
 Twice during deployment a single `eth_getBalance` came back as zero and a `price()` call as empty,
