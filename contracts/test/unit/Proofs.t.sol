@@ -36,7 +36,7 @@ contract Proofs is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });
@@ -65,16 +65,21 @@ contract Proofs is Test {
     // to add a margin; apps/keeper/src/liquidate.ts:99 adds 1%. That margin is then required to come
     // out of the swap as well, so a liquidation that nets a real profit reverts as NoProfit.
     // -------------------------------------------------------------------------------------------
-    function test_proof_noProfitRevertsALiquidationThatIsActuallyProfitable() public {
+    function test_noProfitMeasuresTheRepaymentNotTheLoan() public {
         // Morpho will pull 500 USDG for 10 collateral; the pool pays 502 USDG for those 10.
         // Net to the contract: +2 USDG. Unambiguously profitable.
         morpho.setRepayPerCollateral(50e6); // 10e18 collateral -> 500e6 repaid
         router.set(50.2e6); // 10e18 collateral -> 502e6 received
 
+        // The oracle sits where the pool sits, so the price floor is satisfied and cannot be the
+        // thing under test: what is under test is the margin the keeper adds to the flash loan.
+        MockOracle(params.oracle).set(50.2e24);
+
         uint256 flashAmount = 505e6; // the keeper's 1% margin over the 500 it expects to repay
 
+        // This used to revert `NoProfit(502, 505)` — comparing the sale against the size of the
+        // loan rather than against what Morpho took out of it.
         vm.prank(KEEPER);
-        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.NoProfit.selector, uint256(502e6), flashAmount));
         liquidator.liquidate(
             FlashLiquidator.LiquidateParams({
                 marketParams: params,
@@ -83,12 +88,17 @@ contract Proofs is Test {
                 repaidShares: 0,
                 swapFee: 500,
                 flashAmount: flashAmount,
-                minAmountOut: 400e6 // the pool floor is satisfied; only the contract's own guard bites
+                minAmountOut: 400e6
             })
         );
+        assertEq(usdg.balanceOf(OWNER), 2e6, "the profit the margin used to cost");
+        assertEq(usdg.balanceOf(address(liquidator)), 0);
 
-        // The same liquidation with a flash loan sized to the penny goes through and pays the owner.
+        // And a sale that genuinely does not cover the repayment is still refused, so the guard was
+        // relaxed rather than removed.
+        router.set(49e6);
         vm.prank(KEEPER);
+        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.NoProfit.selector, uint256(490e6), uint256(500e6)));
         liquidator.liquidate(
             FlashLiquidator.LiquidateParams({
                 marketParams: params,
@@ -96,11 +106,10 @@ contract Proofs is Test {
                 seizedAssets: 10e18,
                 repaidShares: 0,
                 swapFee: 500,
-                flashAmount: 500e6,
+                flashAmount: flashAmount,
                 minAmountOut: 400e6
             })
         );
-        assertEq(usdg.balanceOf(OWNER), 2e6, "the profit that the first call rejected");
     }
 
     // -------------------------------------------------------------------------------------------
@@ -108,18 +117,26 @@ contract Proofs is Test {
     // sqrtPriceX96 * sqrtPriceX96 on line 68 is plain checked arithmetic; above tick ~443,636 it
     // overflows and price() reverts with Panic(0x11) instead of any error the contract declares.
     // -------------------------------------------------------------------------------------------
-    function test_proof_twapOracleOverflowsAtHighTicksInsteadOfReverting() public {
+    function test_twapOraclePricesTheWholeUniswapTickRange() public {
         MockERC20 stock = new MockERC20("Stock", "STK", 18);
         MockERC20 quote = new MockERC20("USDG", "USDG", 6);
         // USDG is token0, the 18-decimal token is token1 — the HIMS ordering on this chain.
         MockV3Pool pool = new MockV3Pool(address(quote), address(stock));
         TwapOracle o = new TwapOracle(address(pool), address(stock), address(quote), 1800);
 
+        // 443,636 used to be the last tick that worked: the square of sqrtPriceX96 overflowed a
+        // uint256 one tick later and panicked, halfway through Uniswap's own legal range.
         pool.setMeanTick(443_636, 1800);
-        o.price(); // last tick that still works
+        uint256 below = o.price();
 
         pool.setMeanTick(443_637, 1800);
-        vm.expectRevert(stdError.arithmeticError);
+        uint256 above = o.price();
+        assertLe(above, below, "this pool is inverted, so a higher tick is a lower price");
+
+        // And all the way out to Uniswap's MAX_TICK, the answer is a revert with a name on it
+        // rather than a panic — the price genuinely is outside what a 1e36 scale can carry.
+        pool.setMeanTick(887_272, 1800);
+        vm.expectRevert(TwapOracle.PriceOutOfRange.selector);
         o.price();
     }
 
@@ -157,13 +174,14 @@ contract Proofs is Test {
     // CLAIM 4: Lens._accrued mints fee shares but never advances lastUpdate, so marketView asks the
     // IRM for a rate against a state whose utilisation has moved forward while its clock has not.
     // -------------------------------------------------------------------------------------------
-    function test_proof_accruedStateKeepsAStaleLastUpdate() public {
+    function test_accruedStateStampsItsOwnLastUpdate() public {
         uint128 t0 = uint128(block.timestamp);
         MockIrm(params.irm).set(uint256(1e18) / 365 days);
         vm.warp(block.timestamp + 30 days);
 
         Lens.MarketView memory v = lens.marketView(params);
         assertGt(v.state.totalBorrowAssets, 50_000e6, "interest was applied");
-        assertEq(v.state.lastUpdate, t0, "but the state still claims it was touched 30 days ago");
+        assertEq(v.state.lastUpdate, uint128(block.timestamp), "and the clock was applied with it");
+        assertGt(v.state.lastUpdate, t0);
     }
 }

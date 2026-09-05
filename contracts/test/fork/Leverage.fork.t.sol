@@ -118,10 +118,12 @@ contract LeverageForkTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: debt,
+                repayShares: 0,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (debt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: debt
             })
         );
         vm.stopPrank();

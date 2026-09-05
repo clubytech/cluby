@@ -81,10 +81,12 @@ contract ProofLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: quotedDebt,
+                repayShares: 0,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: quotedDebt
             })
         );
 
@@ -111,10 +113,12 @@ contract ProofLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: quotedDebt,
+                repayShares: 0,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: quotedDebt
             })
         );
 
@@ -139,10 +143,12 @@ contract ProofLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: quotedDebt,
+                repayShares: 0,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: quotedDebt
             })
         );
 
@@ -192,10 +198,12 @@ contract ProofLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: generous,
+                repayShares: 0,
                 collateralToSell: toSell,
                 swapFee: 500,
                 minLoanOut: (generous * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: generous
             })
         );
         assertEq(MORPHO.position(NVDA_MARKET, user).borrowShares, 0, "over-repay should clear the debt");
@@ -223,10 +231,12 @@ contract ProofLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: quotedDebt,
+                repayShares: 0,
                 collateralToSell: (((quotedDebt * ORACLE_SCALE) / price) * 106) / 100,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: quotedDebt
             })
         );
     }

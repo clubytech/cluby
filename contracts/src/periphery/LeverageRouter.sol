@@ -51,14 +51,28 @@ contract LeverageRouter is IMorphoFlashLoanCallback {
 
     struct CloseParams {
         MarketParams marketParams;
-        /// @dev Debt to repay. Pass the full debt in assets to close the position outright.
+        /// @dev Debt to repay, in loan-token units. Exclusive with `repayShares` — pass one, leave
+        /// the other zero, exactly as Morpho's own `repay` requires.
+        ///
+        /// This is the right field for paying part of a position down. It is the WRONG field for
+        /// closing one outright: debt accrues every second, so an amount quoted in one block is
+        /// short in the next and leaves shares behind, while an amount padded to be safe burns more
+        /// shares than exist and reverts inside Morpho with an unlabelled arithmetic panic.
         uint256 repayAmount;
+        /// @dev Debt to repay, in borrow shares. Pass the position's whole `borrowShares` here to
+        /// close it outright: shares are exact at any timestamp, so this is the only formulation
+        /// that lands on zero in a block the caller did not have to predict.
+        uint256 repayShares;
         /// @dev Collateral to withdraw and sell to fund the repayment.
         uint256 collateralToSell;
         uint24 swapFee;
         /// @dev Minimum loan asset the sale must return.
         uint256 minLoanOut;
         address onBehalf;
+        /// @dev Loan asset to flash-borrow. Must cover what Morpho will pull for the repayment;
+        /// when repaying by shares that is only known inside the callback, so the caller quotes an
+        /// upper bound and the surplus goes back in the same transaction.
+        uint256 flashAmount;
     }
 
     event Opened(address indexed user, uint256 equity, uint256 exposure, uint256 debt);
@@ -67,6 +81,7 @@ contract LeverageRouter is IMorphoFlashLoanCallback {
     error NotMorpho();
     error NotAuthorized();
     error SwapShortfall(uint256 received, uint256 needed);
+    error InconsistentInput();
 
     constructor(address _morpho, address _router) {
         morpho = IMorpho(_morpho);
@@ -84,11 +99,17 @@ contract LeverageRouter is IMorphoFlashLoanCallback {
     }
 
     /// @notice Unwind a position: repay debt out of collateral, keep whatever is left over.
+    /// @dev To close outright, pass the position's `borrowShares` in `repayShares` and an upper
+    /// bound on the debt in `flashAmount`. To pay part of it down, pass `repayAmount` instead.
     function close(CloseParams calldata p) external {
         if (p.onBehalf != msg.sender) revert NotAuthorized();
         if (!morpho.isAuthorized(msg.sender, address(this))) revert NotAuthorized();
+        // Morpho's own rule, enforced here so the caller gets a name instead of a revert from
+        // inside Morpho: exactly one of the two is set.
+        if ((p.repayAmount == 0) == (p.repayShares == 0)) revert InconsistentInput();
+        if (p.flashAmount < p.repayAmount) revert InconsistentInput();
 
-        morpho.flashLoan(p.marketParams.loanToken, p.repayAmount, abi.encode(Action.Close, abi.encode(p)));
+        morpho.flashLoan(p.marketParams.loanToken, p.flashAmount, abi.encode(Action.Close, abi.encode(p)));
     }
 
     function onMorphoFlashLoan(uint256 assets, bytes calldata data) external {
@@ -139,7 +160,7 @@ contract LeverageRouter is IMorphoFlashLoanCallback {
         IERC20 collateral = IERC20(p.marketParams.collateralToken);
 
         loanToken.forceApprove(address(morpho), type(uint256).max);
-        morpho.repay(p.marketParams, assets, 0, p.onBehalf, "");
+        (uint256 repaid,) = morpho.repay(p.marketParams, p.repayAmount, p.repayShares, p.onBehalf, "");
         morpho.withdrawCollateral(p.marketParams, p.collateralToSell, p.onBehalf, address(this));
 
         collateral.forceApprove(address(router), p.collateralToSell);
@@ -154,7 +175,11 @@ contract LeverageRouter is IMorphoFlashLoanCallback {
                 sqrtPriceLimitX96: 0
             })
         );
-        if (received < assets) revert SwapShortfall(received, assets);
+        // The sale has to cover what Morpho actually took, not the size of the flash loan. Those
+        // are different numbers whenever the caller quoted an upper bound, which is always when
+        // closing by shares — and comparing against the loan would reject the very repayments this
+        // field exists to make.
+        if (received < repaid) revert SwapShortfall(received, repaid);
 
         loanToken.forceApprove(address(morpho), assets);
 
@@ -162,7 +187,7 @@ contract LeverageRouter is IMorphoFlashLoanCallback {
         _sweep(loanToken, p.onBehalf, assets);
         _sweep(collateral, p.onBehalf, 0);
 
-        emit Closed(p.onBehalf, assets, p.collateralToSell, returned);
+        emit Closed(p.onBehalf, repaid, p.collateralToSell, returned);
     }
 
     /// @dev Anything above `keep` goes back to the user in the same transaction. `keep` is what

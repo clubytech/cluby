@@ -47,7 +47,7 @@ contract OperabilityProofTest is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });
@@ -76,36 +76,16 @@ contract OperabilityProofTest is Test {
     // safety habit — and a liquidation that ends the transaction solvent AND in profit reverts,
     // with a NoProfit() that blames the swap for the keeper's sizing.
     // ---------------------------------------------------------------------------------------
-    function test_proof_noProfitRejectsASolventProfitableLiquidation() public {
-        // Morpho will pull 500 USDG for 10 collateral (mock default 50e6 per unit).
-        // The pool pays 60 USDG per unit, so the swap returns 600.
-        router.set(60e6);
-
-        // The keeper borrows 700 rather than 505 — a wider margin than the 1% it uses today, which
-        // is what anyone would reach for after one liquidation reverted for want of balance.
-        uint256 flashAmount = 700e6;
-
-        // Where the money actually stands at the moment of the check:
-        //   held = flashAmount - repaid + received = 700 - 500 + 600 = 800
-        //   owed = 700
-        // The contract is solvent by 100 USDG. It reverts anyway.
-        vm.prank(KEEPER);
-        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.NoProfit.selector, 600e6, 700e6));
-        liquidator.liquidate(
-            FlashLiquidator.LiquidateParams({
-                marketParams: params,
-                borrower: BORROWER,
-                seizedAssets: 10e18,
-                repaidShares: 0,
-                swapFee: 500,
-                flashAmount: flashAmount,
-                minAmountOut: 550e6
-            })
-        );
-
-        // And the same liquidation, at the same price, with a flash loan sized the way the keeper
-        // sizes it today, goes through and pays the owner 100 USDG. Nothing about the market or
-        // the pool changed between these two calls — only `flashAmount`.
+    function test_solventProfitableLiquidationIsNotRejectedByItsOwnFlashMargin() public {
+        // Morpho will pull 500 USDG for 10 collateral (mock default 50e6 per unit), and the pool
+        // pays the oracle's 100 per unit, so the sale returns 1,000. Honest market, real profit.
+        //
+        // The keeper borrows 1,500 rather than 505 — the wider margin anyone would reach for after
+        // one liquidation reverted for want of balance. Where the money stands at the check:
+        //   held = flashAmount - repaid + received = 1500 - 500 + 1000 = 2000
+        //   owed = 1500
+        // Solvent by 500. The old gate compared `received` against the size of the LOAN and
+        // reverted anyway; the fixed one compares it against what Morpho actually took.
         vm.prank(KEEPER);
         liquidator.liquidate(
             FlashLiquidator.LiquidateParams({
@@ -114,11 +94,11 @@ contract OperabilityProofTest is Test {
                 seizedAssets: 10e18,
                 repaidShares: 0,
                 swapFee: 500,
-                flashAmount: 505e6,
+                flashAmount: 1500e6,
                 minAmountOut: 550e6
             })
         );
-        assertEq(usdg.balanceOf(OWNER), 100e6, "the liquidation that reverted was worth 100 USDG");
+        assertEq(usdg.balanceOf(OWNER), 500e6, "an oversized flash loan must not reject the profit");
         assertEq(usdg.balanceOf(address(liquidator)), 0);
     }
 

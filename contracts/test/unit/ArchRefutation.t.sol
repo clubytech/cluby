@@ -82,7 +82,9 @@ contract ArchRefutation is Test {
         morpho = new MockMorpho();
         usdg = new MockERC20("USDG", "USDG", 6);
         nvda = new MockERC20("NVDA", "NVDA", 18);
-        router = new MockRouter(100e6);
+        // The pool has to agree with the oracle, or every price floor downstream is testing the
+        // gap between two mocks rather than the contract.
+        router = new MockRouter(231.46e6);
         liquidator = new FlashLiquidator(address(morpho), address(router), OWNER);
         lens = new Lens(address(morpho));
 
@@ -159,7 +161,7 @@ contract ArchRefutation is Test {
     /// liquidation the report says is at risk goes through and pays the owner.
     function test_refute_keeperSizedLiquidationNeverHitsNoProfit() public {
         uint256 seized = 10e18;
-        uint256 seizedValue = 1000e6; // MockRouter pays 100e6 per collateral unit
+        uint256 seizedValue = 2314.6e6; // 10 collateral at the oracle's $231.46
         (uint256 flashAmount, uint256 minAmountOut, bool skipped) = _keeperPlan(params.lltv, seizedValue);
         assertFalse(skipped);
 
@@ -180,9 +182,12 @@ contract ArchRefutation is Test {
     /// writes lastUpdate. Lens does the same thing, so the accrued debt — the only number here that
     /// moves money — is bit-identical to Morpho's.
     ///
-    /// What is actually wrong is narrower: `marketView` makes a SECOND borrowRateView call on the
-    /// already-accrued struct, so the published APY is the trailing average over the idle window
-    /// rather than the forward rate. A display number, not a money number.
+    /// What was actually wrong was narrower, and is now fixed: `marketView` makes a SECOND
+    /// borrowRateView call on the already-accrued struct. While `_accrued` left `lastUpdate` in the
+    /// past, that second call was answered for a window that had already been charged, so the
+    /// published APY was the trailing average rather than the forward rate. Stamping the timestamp
+    /// makes the quote forward-looking without touching the debt, which this test pins from both
+    /// sides.
     function test_refute_lensAccruesExactlyWhatMorphoWouldAccrue() public {
         ElapsedIrm eirm = new ElapsedIrm(1e9);
         params.irm = address(eirm);
@@ -214,8 +219,17 @@ contract ArchRefutation is Test {
             uint256(tBorrow) + morphoInterest,
             "Lens debt differs from Morpho's"
         );
-        // Not "twice": exactly once, with the same rate Morpho itself uses.
-        assertEq(v.borrowRatePerSecond, morphoRate, "the quoted rate is the accrual rate, not a doubled one");
+        // Not "twice": exactly once, with the same rate Morpho itself uses. The debt above is the
+        // proof of that; it is bit-identical.
+        //
+        // The quoted rate is a different number on purpose. `_accrued` now stamps `lastUpdate`, so
+        // the IRM is asked about a market with no unaccounted seconds in it and answers with the
+        // rate from here on — which is what an APY on a screen means. The old behaviour returned
+        // `morphoRate`, the average across the window that was just charged.
+        Market memory current = v.state;
+        assertEq(uint256(current.lastUpdate), block.timestamp, "accrued state still claims to be stale");
+        assertEq(v.borrowRatePerSecond, eirm.borrowRate(params, current), "quote is not the forward rate");
+        assertLt(v.borrowRatePerSecond, morphoRate, "quote did not move off the trailing average");
     }
 
     /* ================================================================== */
@@ -251,14 +265,15 @@ contract ArchRefutation is Test {
     /// panics identically. What the short market changes is only how the state is REACHED — there,
     /// 1 raw unit still carries borrowing power, so the state can be created directly instead of
     /// having to be left behind by a liquidation.
-    function test_confirm_dustPanicIsNotSpecificToShortMarkets() public {
+    function test_dustReadsOnLongMarketsToo() public {
         morpho.setPosition(params, BORROWER, Position({supplyShares: 0, borrowShares: 1e6, collateral: 1}));
-        vm.expectRevert(stdError.arithmeticError);
-        lens.userView(params, BORROWER, 0);
+        Lens.UserView memory dust = lens.userView(params, BORROWER, 0);
+        assertEq(dust.liquidationPrice, type(uint256).max, "one raw unit must read, not panic");
 
-        // Two raw units on this market is already safe.
+        // Two raw units on this market was always safe, and still reads the ordinary way.
         morpho.setPosition(params, BORROWER, Position({supplyShares: 0, borrowShares: 1e6, collateral: 2}));
-        lens.userView(params, BORROWER, 0);
+        Lens.UserView memory two = lens.userView(params, BORROWER, 0);
+        assertLt(two.liquidationPrice, type(uint256).max, "two units has a real liquidation price");
     }
 
     /* ================================================================== */

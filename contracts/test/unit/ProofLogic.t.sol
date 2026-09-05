@@ -53,7 +53,7 @@ contract ProofLogicTest is Test {
     /// except safeBorrowAssets, which keeps the value computed from the collateral the user has
     /// BEFORE the transaction. For a first position that is zero, while maxBorrowAssets is not.
     function test_proof_previewBorrowLeavesSafeBorrowStale() public view {
-        Lens.UserView memory u = lens.previewBorrow(params, BORROWER, 10e18, 0);
+        Lens.UserView memory u = lens.previewBorrow(params, BORROWER, 10e18, 0, 0);
 
         console2.log("collateralValue ", u.collateralValue);
         console2.log("maxBorrowAssets ", u.maxBorrowAssets);
@@ -67,7 +67,7 @@ contract ProofLogicTest is Test {
     /// a number the caller picks, instead of against what Morpho actually pulled to repay the
     /// borrower. Size the loan with a margin — which the contract's own comment tells the keeper to
     /// do — and a liquidation that clears a real profit reverts.
-    function test_proof_profitableLiquidationRevertsOnFlashMargin() public {
+    function test_profitableLiquidationSurvivesTheKeepersFlashMargin() public {
         MockERC20 usdg = new MockERC20("USDG", "USDG", 6);
         MockERC20 nvda = new MockERC20("NVDA", "NVDA", 18);
         MockRouter router = new MockRouter(100e6);
@@ -77,7 +77,10 @@ contract ProofLogicTest is Test {
         MarketParams memory p = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            // Priced where the pool is: 50.2 USDG a share on Morpho's 1e36 scale, 18->6 decimals.
+            // The contract's own floor reads this, so a fixture whose oracle disagrees with its
+            // pool would be testing the gap between the two rather than the flash-margin question.
+            oracle: address(new MockOracle(50.2e24)),
             irm: address(new MockIrm(0)),
             lltv: LLTV
         });
@@ -106,6 +109,7 @@ contract ProofLogicTest is Test {
         uint256 flashAmount = (repaid * 101) / 100; // 505 USDG
 
         assertGt(received, repaid, "the liquidation is profitable on the money that actually moved");
+        assertLt(received, flashAmount, "and the flash loan is larger than the sale: the old trap");
 
         liq.liquidate(
             FlashLiquidator.LiquidateParams({

@@ -137,7 +137,7 @@ contract LensTest is Test {
     /// The preview a wallet signs against must match what the position becomes.
     function test_previewBorrowMatchesResultingPosition() public {
         _setPosition(10e18, 0);
-        Lens.UserView memory preview = lens.previewBorrow(params, BORROWER, 0, 1_000e6);
+        Lens.UserView memory preview = lens.previewBorrow(params, BORROWER, 0, 1_000e6, 0);
 
         _setPosition(10e18, 1_000e6);
         Lens.UserView memory actual = lens.userView(params, BORROWER, 0);

@@ -56,7 +56,9 @@ contract ArchProofs is Test {
         morpho = new MockMorpho();
         usdg = new MockERC20("USDG", "USDG", 6);
         nvda = new MockERC20("NVDA", "NVDA", 18);
-        router = new MockRouter(100e6); // 1 collateral -> 100 USDG
+        // The pool pays what the oracle says a share is worth. A mock pool that disagrees with
+        // the mock oracle tests the gap between two fixtures, not the contract between them.
+        router = new MockRouter(231.46e6);
         liquidator = new FlashLiquidator(address(morpho), address(router), OWNER);
         lens = new Lens(address(morpho));
 
@@ -97,18 +99,20 @@ contract ArchProofs is Test {
     /// That is a 500 USDG profit no matter how the repayment was funded. Flash-borrowing 1,500
     /// instead of 505 leaves the contract holding 2,000 against a 1,500 obligation — solvent, and
     /// 500 in profit — yet `received < assets` at FlashLiquidator.sol:120 reverts it.
-    function test_proof_oversizedFlashLoanRevertsAProfitableLiquidation() public {
+    function test_flashLoanSizeDoesNotDecideWhetherALiquidationIsProfitable() public {
         // Baseline: the same liquidation, correctly sized, pays the owner 500 USDG.
         uint256 snap = vm.snapshotState();
         vm.prank(KEEPER);
         liquidator.liquidate(_p(10e18, 505e6, 920e6));
-        assertEq(usdg.balanceOf(OWNER), 500e6, "correctly sized liquidation is profitable");
+        assertEq(usdg.balanceOf(OWNER), 1814.6e6, "correctly sized liquidation is profitable");
         vm.revertToState(snap);
 
-        // Same seizure, same pool, same oracle floor. Only the flash size changed.
+        // Same seizure, same pool, same oracle floor, three times the flash loan. It goes through
+        // and pays the same profit: what the contract borrowed is not what it had to earn back,
+        // and `NoProfit` now says so by comparing against `repaid`.
         vm.prank(KEEPER);
-        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.NoProfit.selector, uint256(1000e6), uint256(1500e6)));
         liquidator.liquidate(_p(10e18, 1500e6, 920e6));
+        assertEq(usdg.balanceOf(OWNER), 1814.6e6, "flash size must not change the outcome");
     }
 
     /* ------------------------------------------------------------------ */
@@ -160,7 +164,7 @@ contract ArchProofs is Test {
     /// returned struct claims interest was accrued at a timestamp it was not. `marketView` then
     /// feeds that struct straight back into `borrowRateView`, which charges the elapsed window a
     /// second time: the rate the site quotes is not the rate Morpho would report after accrual.
-    function test_proof_lensMarketStateIsInternallyInconsistent() public {
+    function test_accruedStateCarriesItsOwnTimestampAndQuotesTheForwardRate() public {
         ElapsedSensitiveIrm eirm = new ElapsedSensitiveIrm(1e9);
         params.irm = address(eirm);
         morpho.setMarket(
@@ -180,20 +184,17 @@ contract ArchProofs is Test {
 
         Lens.MarketView memory v = lens.marketView(params);
 
-        // Interest was applied...
+        // Interest was applied, and the clock moved with it, so the struct is one a Morpho storage
+        // slot could actually hold.
         assertGt(v.state.totalBorrowAssets, 40_000e6, "no interest applied");
-        // ...but the clock was not, so this struct is a state no Morpho storage slot can hold.
-        assertEq(uint256(v.state.lastUpdate), t0, "lastUpdate silently left in the past");
-        assertLt(uint256(v.state.lastUpdate), block.timestamp);
+        assertEq(uint256(v.state.lastUpdate), block.timestamp, "accrued state must not stay stale");
+        assertGt(uint256(v.state.lastUpdate), t0);
 
-        // What Morpho itself would report right after accruing: elapsed == 0.
-        Market memory settled = v.state;
-        settled.lastUpdate = uint128(block.timestamp);
-        uint256 trueRate = eirm.borrowRateView(params, settled);
-
+        // Which makes the published rate the forward one — what Morpho itself would report right
+        // after accruing, at elapsed == 0 — instead of the average across the window just charged.
+        uint256 trueRate = eirm.borrowRateView(params, v.state);
         assertEq(trueRate, 1e9);
-        assertEq(v.borrowRatePerSecond, 1e9 + 3 days, "Lens charges the elapsed window twice");
-        assertGt(v.borrowRatePerSecond, trueRate);
+        assertEq(v.borrowRatePerSecond, trueRate, "quoted rate must be the forward rate");
     }
 
     /* ------------------------------------------------------------------ */
@@ -203,15 +204,19 @@ contract ArchProofs is Test {
     /// `previewBorrow` (Lens.sol:107-133) overwrites six of UserView's nine fields and leaves the
     /// rest as the caller's CURRENT position. `safeBorrowAssets` — the number the deposit screen
     /// exists to show — still describes the collateral the user has not deposited yet.
-    function test_proof_previewBorrowLeavesSafeBorrowDescribingTheOldPosition() public {
+    function test_previewBorrowRecomputesTheSafeCapAgainstThePreviewedCollateral() public {
         morpho.setPosition(params, BORROWER, Position({supplyShares: 0, borrowShares: 0, collateral: 0}));
 
-        Lens.UserView memory u = lens.previewBorrow(params, BORROWER, 10e18, 0);
+        Lens.UserView memory u = lens.previewBorrow(params, BORROWER, 10e18, 0, 0);
 
         assertEq(u.collateral, 10e18);
         assertGt(u.maxBorrowAssets, 0, "maxBorrow was recomputed");
-        // ...but safeBorrowAssets was not, and still reflects zero collateral.
-        assertEq(u.safeBorrowAssets, 0, "safeBorrowAssets tracks the deposit");
+        // With a zero margin the safe cap IS the max, and with a margin it sits strictly inside it.
+        assertEq(u.safeBorrowAssets, u.maxBorrowAssets, "safe cap must track the previewed deposit");
+
+        Lens.UserView memory m = lens.previewBorrow(params, BORROWER, 10e18, 0, 0.05e18);
+        assertLt(m.safeBorrowAssets, m.maxBorrowAssets, "the margin must bite");
+        assertGt(m.safeBorrowAssets, 0);
     }
 
     /* ------------------------------------------------------------------ */
@@ -242,7 +247,7 @@ contract ArchProofs is Test {
     /// Uniswap's own OracleLibrary uses FullMath.mulDiv precisely to avoid this. An oracle that
     /// reverts does not fail safe on Morpho: `liquidate` and `withdrawCollateral` both call
     /// `price()`, so the market freezes with the bad debt inside it.
-    function test_proof_twapOracleRevertsInsideUniswapsValidTickRange() public {
+    function test_twapOraclePricesInsideUniswapsValidTickRange() public {
         MockERC20 a = new MockERC20("A", "A", 6);
         MockERC20 b = new MockERC20("B", "B", 18);
         (address t0, address t1) = address(a) < address(b) ? (address(a), address(b)) : (address(b), address(a));
@@ -253,10 +258,49 @@ contract ArchProofs is Test {
         pool.setMeanTick(443_000, 1800);
         oracle.price();
 
-        // Still a legal Uniswap tick (MAX_TICK is 887,272) — and it panics on overflow.
+        // Still a legal Uniswap tick (MAX_TICK is 887,272). It used to panic on overflow here;
+        // now it prices, because the square goes through mulDiv's 512-bit intermediate.
         pool.setMeanTick(444_000, 1800);
-        vm.expectRevert(stdError.arithmeticError);
-        oracle.price();
+        assertGt(oracle.price(), 0);
+    }
+
+    /// The window is only a defence if the pool can physically reach back over it. Uniswap's ring
+    /// advances at most once a second, so the oracle refuses to be constructed against a pool whose
+    /// ring is shorter than the window it was asked for.
+    function test_twapOracleRefusesAPoolWhoseRingCannotHoldItsWindow() public {
+        MockERC20 a = new MockERC20("A", "A", 6);
+        MockERC20 b = new MockERC20("B", "B", 18);
+        (address t0, address t1) = address(a) < address(b) ? (address(a), address(b)) : (address(b), address(a));
+        MockV3Pool pool = new MockV3Pool(t0, t1);
+
+        pool.setObservationCardinality(360); // the live HIMS ring when this was written
+        vm.expectRevert(abi.encodeWithSelector(TwapOracle.RingTooSmall.selector, uint16(360), uint32(1800)));
+        new TwapOracle(address(pool), t1, t0, 1800);
+
+        // Grown to the window — the permissionless call anyone can make — it constructs.
+        pool.setObservationCardinality(1800);
+        TwapOracle ok = new TwapOracle(address(pool), t1, t0, 1800);
+        pool.setMeanTick(100, 1800);
+        assertGt(ok.price(), 0);
+    }
+
+    /// Uniswap rounds the mean tick DOWN, and Solidity's division truncates toward zero, so a
+    /// negative cumulative delta that is not a whole multiple of the window needs a correction.
+    /// A fixture whose delta is always a multiple can never exercise it.
+    function test_twapOracleRoundsTheMeanTickDownOnANegativeRemainder() public {
+        MockERC20 a = new MockERC20("A", "A", 6);
+        MockERC20 b = new MockERC20("B", "B", 18);
+        (address t0, address t1) = address(a) < address(b) ? (address(a), address(b)) : (address(b), address(a));
+        MockV3Pool pool = new MockV3Pool(t0, t1);
+        TwapOracle oracle = new TwapOracle(address(pool), t1, t0, 1800);
+
+        // Delta = -100·1800 - 1: the true mean is just below -100, so the reported tick is -101.
+        pool.setMeanTickWithRemainder(-100, 1800, -1);
+        assertEq(oracle.meanTick(), -101, "a negative remainder must round away from zero");
+
+        // The positive side truncates toward zero, which is already down.
+        pool.setMeanTickWithRemainder(100, 1800, 1);
+        assertEq(oracle.meanTick(), 100);
     }
 
 
@@ -273,7 +317,7 @@ contract ArchProofs is Test {
     /// `userView` is the keeper's only read (apps/keeper/src/liquidate.ts:47-55, inside a
     /// Promise.all with no per-user catch) and `healthFactors` loops it, so ONE such position
     /// makes every health read on that market revert. 1 micro-USDG buys a blind keeper.
-    function test_proof_dustCollateralOnShortMarketBricksTheKeepersRead() public {
+    function test_dustCollateralReadsAsNeverLiquidatableInsteadOfPanicking() public {
         MockERC20 usdgCollateral = new MockERC20("USDG", "USDG", 6);
         MockERC20 stockLoan = new MockERC20("NVDA", "NVDA", 18);
         // NVDA-SHORT price: 1e72 / (long price of 1.8e26) — USDG quoted in NVDA, raw 6->18.
@@ -306,15 +350,20 @@ contract ArchProofs is Test {
 
         morpho.setPosition(shortParams, BORROWER, Position({supplyShares: 0, borrowShares: 1e6, collateral: 1}));
 
-        vm.expectRevert(stdError.arithmeticError);
-        lens.userView(shortParams, BORROWER, 0);
+        // The read survives. `collateral.wMulDown(lltv)` is still zero — that is arithmetic, not a
+        // bug — so the answer is the one the zero-collateral branch already gave: there is no price
+        // at which this becomes liquidatable, because the lend side can never take anything for it.
+        Lens.UserView memory u = lens.userView(shortParams, BORROWER, 0);
+        assertEq(u.liquidationPrice, type(uint256).max, "dust must read as never-liquidatable");
+        assertEq(u.collateral, 1);
 
-        // And the keeper's batch read dies with it, taking every other borrower's health with it.
+        // And the batch read survives with it, which is the property that matters: one dust
+        // position used to take every other borrower's health down with it.
         address[] memory batch = new address[](2);
         batch[0] = address(0xDEAD);
         batch[1] = BORROWER;
-        vm.expectRevert(stdError.arithmeticError);
-        lens.healthFactors(shortParams, batch);
+        uint256[] memory hfs = lens.healthFactors(shortParams, batch);
+        assertEq(hfs.length, 2);
     }
 
     /* --- REFUTED HYPOTHESIS, kept as a regression fence ---------------- */

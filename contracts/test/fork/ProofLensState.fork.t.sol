@@ -87,10 +87,12 @@ contract ProofLensStateTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: debt,
+                repayShares: 0,
                 collateralToSell: (((debt * ORACLE_SCALE) / price) * 106) / 100,
                 swapFee: 500,
                 minLoanOut: (debt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: debt
             })
         );
         vm.stopPrank();

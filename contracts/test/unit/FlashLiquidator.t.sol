@@ -32,7 +32,7 @@ contract FlashLiquidatorTest is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });

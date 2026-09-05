@@ -35,7 +35,7 @@ contract SecurityProofsTest is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });
@@ -66,7 +66,7 @@ contract SecurityProofsTest is Test {
     /// `flashAmount`, `minAmountOut` is the keeper's own floor. So the keeper certifies its own
     /// price. Here the same liquidation that honestly pays the owner 500 USDG is executed by a
     /// keeper who sets minAmountOut = 1 and dumps the collateral at half price. It succeeds.
-    function test_proof_keeperCanRouteLiquidationProfitAwayFromOwner() public {
+    function test_keeperCannotRouteLiquidationProfitAwayFromOwner() public {
         // Honest execution, for the baseline.
         uint256 snap = vm.snapshotState();
         vm.prank(KEEPER);
@@ -86,10 +86,13 @@ contract SecurityProofsTest is Test {
         vm.revertToState(snap);
 
         // Same position, same seizure. The keeper pushes the pool to half price (a sandwich it
-        // placed itself, or one it lets a searcher place) and removes its own floor.
+        // placed itself, or one it lets a searcher place) and removes its own floor. The interest
+        // it is diverting is the owner's liquidation premium, so the owner is the one who has to be
+        // able to bound it — which is what `maxSlippageWad` is.
         router.set(50.5e6);
 
         vm.prank(KEEPER);
+        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.BelowOracleFloor.selector, 505e6, 920e6));
         liquidator.liquidate(
             FlashLiquidator.LiquidateParams({
                 marketParams: params,
@@ -98,26 +101,27 @@ contract SecurityProofsTest is Test {
                 repaidShares: 0,
                 swapFee: 500,
                 flashAmount: 500e6,
-                minAmountOut: 1 // the whole on-chain price defence, set to nothing
+                minAmountOut: 1 // the caller's own price defence, set to nothing
             })
         );
+        assertEq(usdg.balanceOf(OWNER), 0, "nothing moved");
 
-        // The transaction did not revert. 10 NVDA worth 1,000 USDG at the oracle left the system;
-        // the owner received 5. The other 495 sits with whoever was on the other side of the pool.
-        assertEq(usdg.balanceOf(OWNER), 5e6, "owner keeps only the crumb the keeper left");
-        assertLt(usdg.balanceOf(OWNER), honestProfit / 50, "99% of the liquidation bonus is gone");
-        assertEq(usdg.balanceOf(address(liquidator)), 0, "and the contract still holds nothing");
-    }
-
-    /// The same hole, without any key compromise: the contract accepts a swap at ANY price so long
-    /// as it clears the flash loan. `minAmountOut` is the only floor and it is off-chain data.
-    function test_proof_contractHasNoPriceFloorOfItsOwn() public {
-        MockOracle oracle = MockOracle(params.oracle);
-        // Oracle says 1 NVDA = 100 USDG (1e36 on the raw scale with 18/6 decimals folded in).
-        assertEq(oracle.price(), 1e36);
-
-        router.set(50.1e6); // pool at half the oracle
+        // The bound is the owner's to set, and only the owner's. A keeper cannot widen it.
         vm.prank(KEEPER);
+        vm.expectRevert();
+        liquidator.setMaxSlippage(0.6e18);
+
+        // Nor can the owner widen it past the point where it stops being a bound.
+        vm.prank(OWNER);
+        vm.expectRevert(FlashLiquidator.SlippageTooHigh.selector);
+        liquidator.setMaxSlippage(0.5e18);
+
+        // Widened to the maximum the contract allows, the same half-price sale is still refused:
+        // 505 against a floor of 800. Honest depth is what this covers, not a sandwich.
+        vm.prank(OWNER);
+        liquidator.setMaxSlippage(0.2e18);
+        vm.prank(KEEPER);
+        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.BelowOracleFloor.selector, 505e6, 800e6));
         liquidator.liquidate(
             FlashLiquidator.LiquidateParams({
                 marketParams: params,
@@ -129,8 +133,34 @@ contract SecurityProofsTest is Test {
                 minAmountOut: 1
             })
         );
-        // No revert. Nothing in FlashLiquidator ever reads `params.oracle`.
-        assertGt(usdg.balanceOf(OWNER), 0);
+        assertEq(honestProfit, 500e6, "the honest baseline is unaffected");
+        assertEq(usdg.balanceOf(address(liquidator)), 0, "and the contract still holds nothing");
+    }
+
+    /// The same hole, without any key compromise: the contract accepts a swap at ANY price so long
+    /// as it clears the flash loan. `minAmountOut` is the only floor and it is off-chain data.
+    function test_contractEnforcesItsOwnPriceFloorFromTheMarketOracle() public {
+        MockOracle oracle = MockOracle(params.oracle);
+        // Oracle says 1 NVDA = 100 USDG, on Morpho's 1e36 scale with 18/6 decimals folded in.
+        assertEq(oracle.price(), 100e24);
+
+        router.set(50.1e6); // pool at half the oracle
+        vm.prank(KEEPER);
+        // `minAmountOut: 1` is the caller waiving its own floor entirely — which is exactly why the
+        // contract must not rely on it. It reads the market's oracle and refuses the sale itself.
+        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.BelowOracleFloor.selector, 501e6, 920e6));
+        liquidator.liquidate(
+            FlashLiquidator.LiquidateParams({
+                marketParams: params,
+                borrower: BORROWER,
+                seizedAssets: 10e18,
+                repaidShares: 0,
+                swapFee: 500,
+                flashAmount: 500e6,
+                minAmountOut: 1
+            })
+        );
+        assertEq(usdg.balanceOf(OWNER), 0, "nothing was sold");
     }
 }
 
@@ -218,7 +248,7 @@ contract LeverageRouterSweepTest is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });
@@ -290,7 +320,7 @@ contract CallbackSurfaceTest is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });
@@ -335,10 +365,12 @@ contract CallbackSurfaceTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: 1e6,
+                repayShares: 0,
                 collateralToSell: 1e18,
                 swapFee: 500,
                 minLoanOut: 0,
-                onBehalf: VICTIM
+                onBehalf: VICTIM,
+                flashAmount: 1e6
             })
         );
         vm.stopPrank();
@@ -388,7 +420,7 @@ contract InvariantsThatDoNotHold is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });

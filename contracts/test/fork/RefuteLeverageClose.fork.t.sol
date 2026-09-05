@@ -70,10 +70,12 @@ contract RefuteLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: debt,
+                repayShares: 0,
                 collateralToSell: (((debt * ORACLE_SCALE) / price) * 106) / 100,
                 swapFee: 500,
                 minLoanOut: (debt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: debt
             })
         );
         Position memory p = MORPHO.position(NVDA_MARKET, user);
@@ -96,10 +98,12 @@ contract RefuteLeverageCloseTest is Test {
             LeverageRouter.CloseParams({
                 marketParams: params,
                 repayAmount: quotedDebt,
+                repayShares: 0,
                 collateralToSell: (((quotedDebt * ORACLE_SCALE) / price) * 106) / 100,
                 swapFee: 500,
                 minLoanOut: (quotedDebt * 99) / 100,
-                onBehalf: user
+                onBehalf: user,
+                flashAmount: quotedDebt
             })
         );
 

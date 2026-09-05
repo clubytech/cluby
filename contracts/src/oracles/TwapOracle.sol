@@ -30,6 +30,7 @@ contract TwapOracle is IOracle {
     error WindowTooShort();
     error TokenNotInPool();
     error PriceOutOfRange();
+    error RingTooSmall(uint16 cardinality, uint32 needed);
 
     /// @param _window Seconds to average over. 30–60 minutes on this chain: long enough that moving
     /// it costs more than the position it would unlock, short enough to track a real move.
@@ -37,6 +38,20 @@ contract TwapOracle is IOracle {
         if (_window < 300) revert WindowTooShort();
 
         pool = IUniswapV3PoolMinimal(_pool);
+
+        // A window the pool cannot physically reach back over is not a long window, it is an oracle
+        // that reverts. Uniswap's observation ring advances at most once per SECOND — `Oracle.write`
+        // deduplicates by timestamp, not by block — so a pool needs one slot per second of window
+        // in the worst case, and someone moving the tick every second can otherwise push the far
+        // end of the window off the end of the ring. When that happens `observe` reverts `OLD`, and
+        // `borrow`, `withdrawCollateral` and `liquidate` all stop with it: exactly the half that
+        // protects the lender.
+        //
+        // The ring is grown permissionlessly with `increaseObservationCardinalityNext`, so this is
+        // a listing-time chore, not a constraint on which pools can be used.
+        (,,, uint16 cardinality,,,) = pool.slot0();
+        if (cardinality < _window) revert RingTooSmall(cardinality, _window);
+
         address token0 = pool.token0();
         address token1 = pool.token1();
 
@@ -65,7 +80,9 @@ contract TwapOracle is IOracle {
 
         uint256 sqrtPriceX96 = uint256(TickMath.getSqrtRatioAtTick(meanTick));
         // ratioX128 = (sqrtPriceX96 / 2^96)^2 · 2^128 = raw token1 per raw token0, Q128.
-        uint256 ratioX128 = (sqrtPriceX96 * sqrtPriceX96) >> 64;
+        // Through mulDiv, not a shift: the square overflows uint256 above tick 443,637 — half of
+        // Uniswap's own legal range — and would panic there instead of reverting PriceOutOfRange.
+        uint256 ratioX128 = Math.mulDiv(sqrtPriceX96, sqrtPriceX96, 1 << 64);
 
         // mulDiv keeps the 512-bit intermediate: ratio · 1e36 overflows uint256 on its own for any
         // pool where token0 is the cheaper-decimalled asset.

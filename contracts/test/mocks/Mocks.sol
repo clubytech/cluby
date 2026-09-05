@@ -50,6 +50,11 @@ contract MockERC20 {
 }
 
 contract MockOracle is IOracle {
+    /// @dev Morpho's scale: loan-token units per collateral-token unit, times 1e36, with the two
+    /// token decimalses folded in. For 18-decimal collateral against a 6-decimal loan token at $100
+    /// a share that is 100e24, NOT 100e36 and certainly not 1e36 — a mock priced on the raw scale
+    /// tells every price floor above it that the collateral is worth a trillion times what the pool
+    /// will pay, which makes those floors untestable.
     uint256 public price;
 
     constructor(uint256 _price) {
@@ -68,15 +73,38 @@ contract MockV3Pool {
     int56 public cumulativeStart;
     int56 public cumulativeEnd;
 
+    /// @dev Big enough for any window a test asks for, unless a test is specifically about the ring.
+    uint16 public observationCardinality = type(uint16).max;
+
     constructor(address _token0, address _token1) {
         token0 = _token0;
         token1 = _token1;
     }
 
+    function setObservationCardinality(uint16 c) external {
+        observationCardinality = c;
+    }
+
+    function slot0() external view returns (uint160, int24, uint16, uint16, uint16, uint8, bool) {
+        return (0, 0, 0, observationCardinality, observationCardinality, 0, true);
+    }
+
     /// @param tick The arithmetic mean tick the pool should report over `window` seconds.
+    /// @dev `cumulativeStart` is deliberately not zero. With a zero start the cumulative delta is
+    /// always an exact multiple of the window, and the mean-tick rounding correction for negative
+    /// ticks — the one line in the oracle that Uniswap's convention actually requires — can never
+    /// be exercised. The offset is prime to almost any window a caller will pass.
     function setMeanTick(int24 tick, uint32 window) external {
+        cumulativeStart = 7;
+        cumulativeEnd = 7 + int56(tick) * int56(uint56(window));
+    }
+
+    /// @notice Report a cumulative delta that is NOT a whole multiple of the window.
+    /// @dev `remainder` is added to the delta, so the true mean tick sits between `tick` and
+    /// `tick + 1` (or, for a negative tick, is rounded down away from zero).
+    function setMeanTickWithRemainder(int24 tick, uint32 window, int56 remainder) external {
         cumulativeStart = 0;
-        cumulativeEnd = int56(tick) * int56(uint56(window));
+        cumulativeEnd = int56(tick) * int56(uint56(window)) + remainder;
     }
 
     function observe(uint32[] calldata) external view returns (int56[] memory, uint160[] memory) {

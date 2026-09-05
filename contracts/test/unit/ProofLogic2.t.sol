@@ -27,7 +27,7 @@ contract ProofLogic2Test is Test {
         params = MarketParams({
             loanToken: address(usdg),
             collateralToken: address(nvda),
-            oracle: address(new MockOracle(1e36)),
+            oracle: address(new MockOracle(100e24)),
             irm: address(new MockIrm(0)),
             lltv: 0.625e18
         });
@@ -71,29 +71,41 @@ contract ProofLogic2Test is Test {
     /// CLAIM (same root cause as the profit gate): because the gate is `received >= flashAmount`
     /// and not `received >= repaid`, a stray balance sitting in the contract lets a liquidation
     /// that loses money on the money that actually moved go through.
-    function test_proof_strayBalanceFundsALossMakingLiquidation() public {
+    function test_strayBalanceCannotFundALossMakingLiquidation() public {
         // Somebody sends the liquidator 400 USDG. The contract is meant to hold nothing.
         usdg.mint(address(liq), 400e6);
 
         // The pool pays 45 per unit; seizing 10 collateral repays 500 and returns only 450.
         router.set(45e6);
 
-        // Flash only 100, so the gate is `received >= 100e6` — trivially met by a 450 sale.
-        liq.liquidate(
-            FlashLiquidator.LiquidateParams({
-                marketParams: params,
-                borrower: BORROWER,
-                seizedAssets: 10e18,
-                repaidShares: 0,
-                swapFee: 500,
-                flashAmount: 100e6,
-                minAmountOut: 0
-            })
-        );
+        // Flash only 100, so the old gate was `received >= 100e6` — trivially met by a 450 sale,
+        // and the 50 USDG shortfall came quietly out of the donation.
+        //
+        // Two independent guards now refuse it. First the price floor: a pool at 45 against an
+        // oracle at 100 is not a market this contract will sell into, whatever the caller says.
+        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.BelowOracleFloor.selector, 450e6, 920e6));
+        liq.liquidate(_lossMaking());
 
-        // 400 donated, 500 repaid, 450 received: the owner ends up with 350, down 50 on the stray
-        // balance they started with, and the gate called it profit.
-        console2.log("owner USDG after a 'profitable' liquidation", usdg.balanceOf(address(this)));
-        assertGe(usdg.balanceOf(address(this)), 400e6, "the gate should not pass a loss-making sale");
+        // And with the oracle moved down to meet the pool — so the floor is satisfied and cannot be
+        // the thing doing the work — solvency itself rejects it: 450 received against 500 repaid.
+        MockOracle(params.oracle).set(45e24);
+        vm.expectRevert(abi.encodeWithSelector(FlashLiquidator.NoProfit.selector, 450e6, 500e6));
+        liq.liquidate(_lossMaking());
+
+        // The donation is untouched either way.
+        assertEq(usdg.balanceOf(address(liq)), 400e6, "the stray balance was never spent");
+        assertEq(usdg.balanceOf(address(this)), 0);
+    }
+
+    function _lossMaking() internal view returns (FlashLiquidator.LiquidateParams memory) {
+        return FlashLiquidator.LiquidateParams({
+            marketParams: params,
+            borrower: BORROWER,
+            seizedAssets: 10e18,
+            repaidShares: 0,
+            swapFee: 500,
+            flashAmount: 100e6,
+            minAmountOut: 0
+        });
     }
 }

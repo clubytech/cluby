@@ -9,9 +9,11 @@ import {
     IMorpho,
     IMorphoFlashLoanCallback,
     IMorphoLiquidateCallback,
+    IOracle,
     MarketParams
 } from "../interfaces/IMorpho.sol";
 import {ISwapRouter02} from "../interfaces/IExternal.sol";
+import {MathLib} from "../libraries/MathLib.sol";
 
 /// @title FlashLiquidator
 /// @notice Liquidates an unhealthy Morpho position without any capital of its own: borrow the debt
@@ -28,13 +30,26 @@ import {ISwapRouter02} from "../interfaces/IExternal.sol";
 /// that they happen exclusively here. If it is broken or offline, the market still clears.
 contract FlashLiquidator is IMorphoFlashLoanCallback, IMorphoLiquidateCallback, Ownable2Step {
     using SafeERC20 for IERC20;
+    using MathLib for uint256;
+
+    uint256 internal constant WAD = 1e18;
+    uint256 internal constant ORACLE_PRICE_SCALE = 1e36;
 
     IMorpho public immutable morpho;
     ISwapRouter02 public immutable router;
 
-    /// @dev Addresses allowed to trigger a liquidation. The profit always goes to the owner, so a
-    /// keeper key that leaks cannot steal — but it could burn gas, so it is still gated.
+    /// @dev Addresses allowed to trigger a liquidation. A leaked keeper key cannot take the profit
+    /// — it goes to the owner on every path — but it can choose the price the collateral sells at,
+    /// which is why `maxSlippageWad` exists and why this gate is still here.
     mapping(address => bool) public keepers;
+
+    /// @notice How far below the market oracle the seized collateral may be sold, in WAD.
+    /// @dev The caller supplies `minAmountOut`, so without this the only floor on the sale would be
+    /// one the caller chose for itself. This one is set by the owner and read from the market's own
+    /// oracle inside the callback, which is the same price Morpho just used to decide the position
+    /// was liquidatable. It has to leave room for the swap fee and real pool depth, not only for
+    /// the liquidation premium.
+    uint256 public maxSlippageWad = 0.08e18;
 
     struct LiquidateParams {
         MarketParams marketParams;
@@ -60,10 +75,13 @@ contract FlashLiquidator is IMorphoFlashLoanCallback, IMorphoLiquidateCallback, 
         address indexed borrower, address indexed collateral, uint256 seizedAssets, uint256 repaidAssets, uint256 profit
     );
     event KeeperSet(address indexed keeper, bool allowed);
+    event MaxSlippageSet(uint256 maxSlippageWad);
 
     error NotKeeper();
     error NotMorpho();
     error NoProfit(uint256 received, uint256 owed);
+    error BelowOracleFloor(uint256 received, uint256 floor);
+    error SlippageTooHigh();
 
     constructor(address _morpho, address _router, address _owner) Ownable(_owner) {
         morpho = IMorpho(_morpho);
@@ -73,6 +91,15 @@ contract FlashLiquidator is IMorphoFlashLoanCallback, IMorphoLiquidateCallback, 
     function setKeeper(address keeper, bool allowed) external onlyOwner {
         keepers[keeper] = allowed;
         emit KeeperSet(keeper, allowed);
+    }
+
+    /// @notice Set the floor, relative to the market oracle, under which a sale is refused.
+    /// @dev Capped at 20%: past the liquidation premium plus a fee plus honest depth, a number this
+    /// large stops being a safety margin and becomes permission to sell anywhere.
+    function setMaxSlippage(uint256 newMaxSlippageWad) external onlyOwner {
+        if (newMaxSlippageWad > 0.2e18) revert SlippageTooHigh();
+        maxSlippageWad = newMaxSlippageWad;
+        emit MaxSlippageSet(newMaxSlippageWad);
     }
 
     /// @notice Liquidate `borrower`, funding the repayment with a Morpho flash loan.
@@ -113,7 +140,19 @@ contract FlashLiquidator is IMorphoFlashLoanCallback, IMorphoLiquidateCallback, 
             })
         );
 
-        if (received < assets) revert NoProfit(received, assets);
+        // The caller picked `minAmountOut`, so the contract asks the market's own oracle — the same
+        // one Morpho priced the liquidation with — what the seized collateral was worth, and
+        // refuses a sale more than `maxSlippageWad` below it. Without this the only floor on the
+        // price is the one the caller set for itself, which is not a floor.
+        uint256 oracleValue = seized.mulDivDown(IOracle(p.marketParams.oracle).price(), ORACLE_PRICE_SCALE);
+        uint256 floor = oracleValue.wMulDown(WAD - maxSlippageWad);
+        if (received < floor) revert BelowOracleFloor(received, floor);
+
+        // Solvency is `received >= repaid`, not `received >= assets`: the flash loan lent `assets`,
+        // Morpho took `repaid` out of it, and the rest never left. Comparing against the size of
+        // the loan rejects profitable liquidations whenever the keeper borrowed a margin — which it
+        // always does, because seizing by collateral amount only reveals the repayment in here.
+        if (received < repaid) revert NoProfit(received, repaid);
 
         // Morpho pulls the flash loan back from this contract's balance after the callback.
         loanToken.forceApprove(address(morpho), assets);

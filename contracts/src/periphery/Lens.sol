@@ -102,19 +102,27 @@ contract Lens {
         } else {
             u.healthFactorWad = u.maxBorrowAssets.wDivDown(u.borrowAssets);
             u.liquidatable = u.healthFactorWad < WAD;
-            u.liquidationPrice = p.collateral == 0
-                ? type(uint256).max
-                : u.borrowAssets.mulDivUp(ORACLE_PRICE_SCALE, uint256(p.collateral).wMulDown(params.lltv));
+            // The denominator, not the collateral, is what has to be non-zero: one raw unit of an
+            // 18-decimal collateral at any listed LLTV floors to nothing, and `mulDivUp` on a zero
+            // denominator panics rather than reverting. A reader must never be able to panic — a
+            // single dust position would otherwise take every consumer of this view down with it.
+            uint256 denom = uint256(p.collateral).wMulDown(params.lltv);
+            u.liquidationPrice =
+                denom == 0 ? type(uint256).max : u.borrowAssets.mulDivUp(ORACLE_PRICE_SCALE, denom);
         }
     }
 
     /// @notice What a position would look like after a borrow — the preview a wallet signs against.
-    function previewBorrow(MarketParams memory params, address user, uint256 addCollateral, uint256 addBorrow)
-        external
-        view
-        returns (UserView memory u)
-    {
-        u = userView(params, user, 0);
+    /// @dev The site computes this off chain today; this is the on-chain answer for an integrator
+    /// who would rather not reimplement the rounding.
+    function previewBorrow(
+        MarketParams memory params,
+        address user,
+        uint256 addCollateral,
+        uint256 addBorrow,
+        uint256 safeMarginWad
+    ) external view returns (UserView memory u) {
+        u = userView(params, user, safeMarginWad);
 
         uint256 price = IOracle(params.oracle).price();
         uint256 collateral = u.collateral + addCollateral;
@@ -124,6 +132,10 @@ contract Lens {
         u.collateralValue = collateral.mulDivDown(price, ORACLE_PRICE_SCALE);
         u.borrowAssets = borrowAssets;
         u.maxBorrowAssets = u.collateralValue.wMulDown(params.lltv);
+        // Recomputed against the new collateral, not carried over from `userView`: a preview whose
+        // safe cap still describes the old position is worse than no preview at all.
+        uint256 safeLltv = params.lltv > safeMarginWad ? params.lltv - safeMarginWad : 0;
+        u.safeBorrowAssets = u.collateralValue.wMulDown(safeLltv);
 
         if (borrowAssets == 0) {
             u.healthFactorWad = type(uint256).max;
@@ -132,9 +144,8 @@ contract Lens {
         } else {
             u.healthFactorWad = u.maxBorrowAssets.wDivDown(borrowAssets);
             u.liquidatable = u.healthFactorWad < WAD;
-            u.liquidationPrice = collateral == 0
-                ? type(uint256).max
-                : borrowAssets.mulDivUp(ORACLE_PRICE_SCALE, collateral.wMulDown(params.lltv));
+            uint256 denom = collateral.wMulDown(params.lltv);
+            u.liquidationPrice = denom == 0 ? type(uint256).max : borrowAssets.mulDivUp(ORACLE_PRICE_SCALE, denom);
         }
     }
 
@@ -145,7 +156,10 @@ contract Lens {
         }
     }
 
-    /// @notice Health factors for a batch of borrowers: the keeper's hot path.
+    /// @notice Health factors for a batch of borrowers.
+    /// @dev Not what the keeper uses — it calls `userView` per borrower, because a batch that
+    /// reverts tells the operator nothing about which borrower caused it. Kept for integrators
+    /// polling a known-good set, where one round trip beats N.
     function healthFactors(MarketParams memory params, address[] calldata users)
         external
         view
@@ -161,7 +175,13 @@ contract Lens {
     function _accrued(MarketParams memory params, Id id) internal view returns (Market memory m) {
         m = morpho.market(id);
         uint256 elapsed = block.timestamp - uint256(m.lastUpdate);
-        if (elapsed == 0 || m.totalBorrowAssets == 0) return m;
+        if (elapsed == 0) return m;
+        // Morpho stamps the timestamp whether or not anything accrued, and an idle market that
+        // reports an old one would make the IRM adapt twice for the same seconds.
+        if (m.totalBorrowAssets == 0) {
+            m.lastUpdate = uint128(block.timestamp);
+            return m;
+        }
 
         uint256 borrowRate = IIrm(params.irm).borrowRateView(params, m);
         uint256 interest = uint256(m.totalBorrowAssets).wMulDown(borrowRate.wTaylorCompounded(elapsed));
@@ -177,5 +197,10 @@ contract Lens {
             );
             m.totalSupplyShares += uint128(feeShares);
         }
+
+        // The totals are now current, so the timestamp has to say so. Leaving it behind returns a
+        // struct describing a market that never existed, and anyone who feeds it back to the IRM —
+        // as `marketView` does one line later — is asking about a hybrid state.
+        m.lastUpdate = uint128(block.timestamp);
     }
 }
