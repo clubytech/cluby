@@ -15,9 +15,25 @@ import { LENS, LIQUIDATOR, POLL_MS, WATCHDOG_MS, account, log } from "./env.ts";
 
 const WAD = 10n ** 18n;
 
+/**
+ * A quiet keeper and a wedged keeper produce the same log — nothing — and the difference is the
+ * whole job. One line every few minutes says which one this is, and carries the two numbers an
+ * operator would otherwise have to go and look up.
+ */
+const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS ?? 5 * 60 * 1000);
+let lastBeat = 0;
+
 async function liquidationPass() {
   const watch = await refreshBorrowers();
   const candidates = await scanHealth(watch);
+
+  if (Date.now() - lastBeat > HEARTBEAT_MS) {
+    lastBeat = Date.now();
+    const watched = [...watch.values()].reduce((a, s) => a + s.size, 0);
+    const worstHf = candidates.length > 0 ? (Number(candidates[0]!.healthFactor) / 1e18).toFixed(4) : "n/a";
+    log(`alive: ${watched} borrower(s) watched, ${candidates.length} with debt, worst HF ${worstHf}`);
+  }
+
   if (candidates.length === 0) return;
 
   const worst = candidates[0]!;
