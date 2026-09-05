@@ -42,6 +42,7 @@ export type MarketView = {
   lltv: number;
   safeLtv: number;
   maxLeverage: number;
+  poolFee: number;
   oracle: OracleKind;
   feed: `0x${string}` | null;
   price: number | null;
@@ -142,6 +143,15 @@ async function readMarkets(): Promise<MarketView[]> {
         priceAge: age,
         priceStale: source === "chainlink" && age !== null && age > maxAgeOf(m),
         supplyCapUsd: m.supplyCapUsd,
+        /**
+         * The fee tier of the pool a leveraged position is actually swapped through.
+         *
+         * Multiply used to send a hard-coded 500 for every market. NVDA happens to have a 500 pool,
+         * which is why it went unnoticed — but only seven of these forty do. Twenty-one are 3000 and
+         * twelve are 10000, and asking the router to route through a tier that does not exist is a
+         * revert with nothing useful in it.
+         */
+        poolFee: poolOf(subject)?.fee ?? 3000,
         preLiquidation: (deployments.preLiquidations?.[m.key] ?? null) as `0x${string}` | null,
         marketId,
       };

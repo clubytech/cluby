@@ -185,6 +185,8 @@ export default async function MarketPage({ params }: { params: Promise<{ key: st
             lltv={market.lltv}
             safeLtv={market.safeLtv}
             maxLeverage={market.maxLeverage}
+            liquidityUsd={market.liquidityUsd}
+            poolFee={market.poolFee}
             status={market.status}
             marketId={market.marketId}
             collateralAddress={market.collateralAddress}

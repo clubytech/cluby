@@ -18,6 +18,10 @@ type Props = {
   lltv: number;
   safeLtv: number;
   maxLeverage: number;
+  /** USDG the market can actually lend right now. A leveraged open borrows against this. */
+  liquidityUsd: number;
+  /** Fee tier of the pool the router swaps through. Not every market is 500. */
+  poolFee: number;
   status: "listed" | "planned" | "blocked";
   marketId: `0x${string}` | null;
   collateralAddress: `0x${string}` | null;
@@ -94,6 +98,20 @@ export function PositionPanel(p: Props) {
   const borrowLiq =
     price === 0 || collateral === 0 ? null : liquidationPrice(collateral / price, debt, p.lltv, price);
   const plan = leveragePlan(collateralValue, leverage, p.lltv);
+
+  /**
+   * The most leverage this market can actually fund, which is not the same as the most its LLTV
+   * allows.
+   *
+   * Opening at L borrows equity x (L - 1), and a market can only lend what nobody else has already
+   * borrowed. Cluby's NVDA market had 41 cents free while the panel happily offered 1.6x on a
+   * dollar — a 60 cent loan — and the user found out by signing for it and reading "insufficient
+   * liquidity" as an undecoded hex string. The slider stops where the money stops now, and the
+   * reason is written next to it rather than discovered afterwards.
+   */
+  const fundable = collateralValue > 0 ? 1 + p.liquidityUsd / collateralValue : p.maxLeverage;
+  const leverageCeiling = Math.max(1, Math.min(p.maxLeverage, fundable));
+  const overLiquidity = plan.debt > p.liquidityUsd + 1e-9;
 
   const collateralUnits = price === 0 ? 0n : BigInt(Math.round((collateral / price) * 10 ** p.collateralDecimals));
   const debtUnits = BigInt(Math.round(debt * 10 ** p.loanDecimals));
@@ -185,7 +203,7 @@ export function PositionPanel(p: Props) {
           marketParams,
           equityCollateral: equityUnits,
           flashAmount: flashUnits,
-          swapFee: 500,
+          swapFee: p.poolFee,
           minCollateralOut,
           onBehalf: address,
         },
@@ -336,7 +354,7 @@ export function PositionPanel(p: Props) {
               <input
                 type="range"
                 min={1}
-                max={Math.max(1.1, Number(p.maxLeverage.toFixed(1)))}
+                max={Math.max(1.1, Number(leverageCeiling.toFixed(2)))}
                 step={0.1}
                 value={leverage}
                 onChange={(e) => setLeverage(Number(e.target.value))}
@@ -430,10 +448,14 @@ export function PositionPanel(p: Props) {
               <button
                 type="button"
                 onClick={openLeveraged}
-                disabled={busy || collateral === 0 || leverage <= 1}
+                disabled={busy || collateral === 0 || leverage <= 1 || overLiquidity}
                 className="w-full rounded-full bg-brand-bright px-6 py-3 text-sm font-medium text-bg-deep hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-text-soft"
               >
-                {busy ? "Signing…" : `Open ${leverage.toFixed(1)}× position`}
+                {busy
+                  ? "Signing…"
+                  : overLiquidity
+                    ? `Only ${usd(p.liquidityUsd)} available to borrow`
+                    : `Open ${leverage.toFixed(1)}× position`}
               </button>
             )
           ) : (
