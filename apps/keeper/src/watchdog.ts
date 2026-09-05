@@ -55,9 +55,16 @@ export async function watchdogPass() {
       continue;
     }
 
-    // Morpho's price is raw-to-raw on a 1e36 scale, so for an 18-decimal collateral quoted in
-    // 6-decimal USDG the human price is oraclePrice / 1e24. Same conversion the site does.
-    const oracleHuman = Number(oraclePrice) / 1e24;
+    /**
+     * Morpho's price is raw-to-raw on a 1e36 scale. For a long market — 18-decimal collateral
+     * quoted in 6-decimal USDG — the human price is oraclePrice / 1e24.
+     *
+     * A short market is the same market inverted: the collateral is USDG and the borrowed asset is
+     * the stock, so its oracle answers "stock per USDG" and the human price of the stock is
+     * 1e48 / oraclePrice. Comparing the raw inverted number against a pool price reads as a
+     * divergence of 10^23 basis points, which is not an alert, it is noise that buries real ones.
+     */
+    const oracleHuman = def.side === "short" ? 1e48 / Number(oraclePrice) : Number(oraclePrice) / 1e24;
     const divergenceBps = Math.round((Math.abs(oracleHuman - twap.price) / twap.price) * 10_000);
 
     log(`${key}: oracle ${oracleHuman.toFixed(4)} vs pool ${twap.price.toFixed(4)} (${divergenceBps} bps)`);

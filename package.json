@@ -11,5 +11,8 @@
     "export:markets": "node --experimental-transform-types packages/config/scripts/export-markets.mjs",
     "build:scripts": "cd contracts && FOUNDRY_PROFILE=deploy forge build",
     "create:markets": "pnpm export:markets && cd contracts && FOUNDRY_PROFILE=deploy forge script script/CreateMarkets.s.sol --rpc-url robinhood --broadcast --slow"
+  },
+  "devDependencies": {
+    "next": "16.3.4"
   }
 }

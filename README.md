@@ -12,7 +12,7 @@ position from becoming bad debt.
 
 | | Address |
 |---|---|
-| Lens | `0x5fC2Cd44d8caA4b3A6e330849bEbc3cA323c625b` |
+| Lens | `0x5FC2CD44D8Caa4B3A6e330849BebC3cA323c625B` |
 | FlashLiquidator | `0x91B3c5b8C76386A8293B1CE97fE8dceB10733F5B` |
 | LeverageRouter | `0xBF6cdE3F772cB3939dFCc313AA4E83C3452bab6B` |
 | CreditRegistry | `0x86e8f3Bf88087774a530d70FfaD19b5257054E53` |

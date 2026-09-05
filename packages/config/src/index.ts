@@ -424,7 +424,7 @@ export const deployments: {
   oracles: Record<string, `0x${string}`>;
   markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
-  lens: "0x5fC2Cd44d8caA4b3A6e330849bEbc3cA323c625b",
+  lens: "0x5FC2CD44D8Caa4B3A6e330849BebC3cA323c625B",
   /**
    * Second deploy: the first (0xDCc269c0…) collapsed the flash-loan size and the swap floor into
    * one number, which holds only while the debt stays under the floor. Abandoned, not upgraded —
