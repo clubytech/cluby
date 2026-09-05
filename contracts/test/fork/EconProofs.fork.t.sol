@@ -61,13 +61,14 @@ contract EconProofsForkTest is Test {
     // N slots holds at most N/10 seconds of history under an attacker who writes every block.
     // Covering a 1800 s window therefore needs ~18000 slots. Assert the far weaker bound
     // (cardinality >= window) and watch it fail anyway.
-    /// KNOWN RED until the rings are paid for. Not a regression and not a mystery: the three pools
-    /// carry 300-360 observation slots against an 1,800-second window, growing them costs about
-    /// 0.077 ETH in total, and the money is not there yet. It is safe to be red because all three
-    /// markets are capped at zero with no supply and no borrows, and the oracle constructor now
-    /// refuses any NEW listing in this state.
+    /// KNOWN RED until the rings FILL. The slots are bought and paid for — all three pools now
+    /// carry `observationCardinalityNext = 1800` — but `observationCardinality`, the number this
+    /// checks and the only one you can actually observe over, does not move until tick-moving swaps
+    /// wrap the index past the old end. On pools this quiet that takes a while, and there is nothing
+    /// to do but wait.
     ///
-    /// To clear it: ./scripts/grow-twap-rings.sh --send, then wait for the swaps to wrap the index.
+    /// It is safe to be red meanwhile: all three markets are capped at zero with no supply and no
+    /// borrows, and the oracle constructor refuses any NEW listing against a ring this short.
     function test_knownRed_twapPoolRingCannotHoldTheOracleWindow() public view {
         address[3] memory pools = [HIMS_POOL, PONS_POOL, CASHCAT_POOL];
         string[3] memory names = ["HIMS", "PONS", "CASHCAT"];
@@ -79,7 +80,7 @@ contract EconProofsForkTest is Test {
             assertGe(
                 uint256(cardinality),
                 uint256(WINDOW),
-                "ring cannot hold the window: run scripts/grow-twap-rings.sh --send"
+                "ring has not filled yet; slots are paid for, waiting on swaps"
             );
         }
     }

@@ -14,7 +14,7 @@ against the chain and the running services rather than against the diff.
 | 5 | Vault has no guardian; Safe owner is the key the project called hot | **script ready, needs an address** | `contracts/script/set-guardian.sh` |
 | 6 | FlashLiquidator reads no oracle — no price floor of its own | **fixed, live** | `maxSlippageWad`, owner-set, capped at 20% |
 | 7 | Unauthenticated HTTP rows become signed transactions | **fixed** | shape-checked in `borrowers.ts` and `scores.ts` |
-| 8 | TwapOracle never checks the pool can reach back over its window | **fixed for new listings; three rings unfunded** | constructor `RingTooSmall`; `scripts/grow-twap-rings.sh` |
+| 8 | TwapOracle never checks the pool can reach back over its window | **fixed; rings bought, filling** | constructor `RingTooSmall`; `scripts/grow-twap-rings.sh` |
 | 9 | `close()` has no deterministic way to close a position | **fixed, live** | `repayShares` + separate `flashAmount` |
 | 10 | Portfolio and MCP compute debt on unaccrued state | **fixed** | `accrued()` in the SDK, `debtOf` rounds up |
 | 11 | `NoProfit` measures the loan, not the repayment | **fixed, live** | one line, plus the same shape in `SwapShortfall` |
@@ -94,12 +94,21 @@ that holds nothing and has no borrows to earn from. And `submitGuardian` on the
 vault, which needs an address only the operator can choose: it has to be one that
 has never been in plaintext, and it must not be the owner.
 
-**The TWAP rings are unfunded.** HIMS 360, PONS 300, CASHCAT 360 observation
-slots against an 1,800-second window, measured on chain. At 22,414 gas a slot
-that is 0.077 ETH for all three. Not urgent — all three markets are capped at
-zero with no supply and no borrows, and the constructor check refuses any new
-listing in this state — but the cheapest of the three pools can be pushed into
-reverting for about $65 an hour, so it should not stay this way once they list.
+**The TWAP rings are bought and filling.** All three pools now carry
+`observationCardinalityNext = 1800`. The live `observationCardinality` still reads
+300–360 and will climb only as tick-moving swaps wrap the index past the old end;
+on pools this quiet that takes a while, and there is nothing to do but wait. The
+markets stay capped at zero until it completes.
+
+Getting there cost more than it should have. `increaseObservationCardinalityNext`
+for 1,440 slots is about 32.3M gas, just over this node's ~32M per-transaction
+ceiling — and a transaction over that ceiling is not rejected, it is mined, burns
+the entire limit and moves nothing. Three of them cost 0.037 ETH and achieved
+nothing, because the script did not check the status afterwards. `cast send` exits
+0 on a mined-and-reverted transaction; this repository had already learned that
+once, in `canary.sh`, and I wrote the same bug again. The script now sizes each
+step by arithmetic, re-estimates immediately before every send, and stops dead on
+the first failure.
 
 **The old keeper key is lost.** 0xc2478f68… held 0.00998 ETH and its key lived in
 the launcher script that the `rsync --delete` removed. It is not recoverable. The
