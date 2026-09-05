@@ -13,6 +13,8 @@ const ORACLE_SCALE = 10n ** 36n;
 /** Morpho's liquidation curve, mirrored so the flash loan can be sized before the call is made. */
 const LIQUIDATION_CURSOR = 3n * 10n ** 17n; // 0.3
 const MAX_LIF = 115n * 10n ** 16n; // 1.15
+/** What FlashLiquidator ships with, used only when the on-chain read fails. */
+const DEFAULT_MAX_SLIPPAGE_WAD = 8n * 10n ** 16n; // 0.08
 
 /** LIF = min(1.15, 1 / (1 − 0.3·(1 − LLTV))). At 62.5% that is 1.1268. */
 export function liquidationIncentiveFactor(lltv: bigint): bigint {
@@ -118,10 +120,14 @@ export async function tryLiquidate(c: Candidate) {
 
   // Never sit below the floor the contract enforces for itself: a sale the contract will refuse is
   // a transaction that should not be built. Read from the contract so the two cannot drift apart.
-  const maxSlippageWad = await pub
+  //
+  // The fallback is the contract's own default, not zero. A zero would make `contractFloor` the
+  // collateral's full oracle value — a floor no pool can ever fill — so a single failed read would
+  // silently stop every liquidation, which is the exact class of failure this pass is fixing.
+  const maxSlippageWad = (await pub
     .readContract({ address: LIQUIDATOR, abi: flashLiquidatorAbi, functionName: "maxSlippageWad" })
-    .catch(() => 0n);
-  const contractFloor = (seizedValue * (WAD - (maxSlippageWad as bigint))) / WAD;
+    .catch(() => DEFAULT_MAX_SLIPPAGE_WAD)) as bigint;
+  const contractFloor = (seizedValue * (WAD - maxSlippageWad)) / WAD;
   if (contractFloor > minAmountOut) minAmountOut = contractFloor;
 
   // Unfillable: we would be demanding more for the collateral than the oracle says it is worth.

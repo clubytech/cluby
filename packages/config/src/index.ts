@@ -424,14 +424,22 @@ export const deployments: {
   oracles: Record<string, `0x${string}`>;
   markets: Record<string, { id: `0x${string}`; oracle: `0x${string}` }>;
 } = {
-  lens: "0x5FC2CD44D8Caa4B3A6e330849BebC3cA323c625B",
   /**
-   * Second deploy: the first (0xDCc269c0…) collapsed the flash-loan size and the swap floor into
-   * one number, which holds only while the debt stays under the floor. Abandoned, not upgraded —
-   * it holds nothing, so replacing it costs a deploy and nothing else.
+   * Third Lens. The second (0x5FC2CD44…) divided by `collateral.wMulDown(lltv)` without checking it
+   * for zero, so one raw unit of an 18-decimal collateral panicked the read — and took every batch
+   * and every keeper pass that touched the market with it.
    */
-  flashLiquidator: "0x91B3c5b8C76386A8293B1CE97fE8dceB10733F5B",
-  leverageRouter: "0xBF6cdE3F772cB3939dFCc313AA4E83C3452bab6B",
+  lens: "0x7148C4F98cA8a4752692C4926E11d2e36E6f066D",
+  /**
+   * Third liquidator. The first (0xDCc269c0…) collapsed the flash-loan size and the swap floor into
+   * one number; the second (0x91B3c5b8…) measured solvency against the size of the flash loan
+   * rather than the repayment, and read no oracle at all, so the only floor on the sale price was
+   * one the caller set for itself. Abandoned, not upgraded — none of them holds anything, so
+   * replacing one costs a deploy and nothing else.
+   */
+  flashLiquidator: "0xC3374D9fB0CC9a85440f26EE461aF6Bfb6c6e7cE",
+  /** Second router: the first (0xBF6cdE3F…) could not express closing a position outright. */
+  leverageRouter: "0x12aD902c5004d5147D7F46dC97818cA26Fcb25cf",
   /** Scores only; it moves what a borrower is paid, never what they may borrow. */
   creditRegistry: "0x86e8f3Bf88087774a530d70FfaD19b5257054E53",
   /**
