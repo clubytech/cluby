@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getTokenListing } from "@/lib/token-listing";
 import { OG_IMAGE } from "@/lib/og-image";
+import { X_HANDLE } from "@/components/social";
 import "./globals.css";
 
 // Inter is variable, so every weight between 100 and 900 is already in the one file: asking for
@@ -41,6 +42,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    // Without these the preview carries no account at all, which is a gap worth closing on a site
+    // whose whole risk is somebody passing off a lookalike.
+    site: `@${X_HANDLE}`,
+    creator: `@${X_HANDLE}`,
     title: "Cluby — credit against tokenized stocks",
     description:
       "Borrow USDG against tokenized stocks. Isolated Morpho Blue markets, Chainlink oracles, zero performance fee.",

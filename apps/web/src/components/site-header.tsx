@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { ConnectButton } from "./connect-button";
 import { Pill, useSlidingPill } from "./sliding-pill";
 import { CaChip } from "./ca-chip";
+import { XLink } from "./social";
 
 type Item = { href: string; label: string; soon?: boolean };
 
@@ -263,6 +264,7 @@ export function SiteHeader({
 
             <div className="hidden items-center gap-2.5 xl:flex">
               <CaChip address={tokenAddress} symbol={tokenSymbol} />
+              <XLink className="press flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white" />
               <ConnectButton compact />
             </div>
 
@@ -311,6 +313,10 @@ export function SiteHeader({
               <div className="mb-2 mt-3 flex flex-col items-center gap-3">
                 <CaChip address={tokenAddress} symbol={tokenSymbol} />
                 <ConnectButton />
+                <XLink
+                  label
+                  className="flex items-center gap-2 rounded-full px-4 py-2 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                />
               </div>
             </nav>
           </div>

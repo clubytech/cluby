@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { XLink } from "./social";
 
 const columns = [
   {
@@ -39,6 +40,10 @@ export function SiteFooter() {
               A curation layer on Morpho Blue: isolated markets that let tokenized stocks back a USDG
               loan. Cluby holds no user funds — deposits and collateral live in Morpho.
             </p>
+            <XLink
+              label
+              className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition-colors hover:border-white/40 hover:bg-white/5 hover:text-white"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-10 sm:gap-16">
