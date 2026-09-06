@@ -54,7 +54,8 @@
     -webkit-font-smoothing: antialiased;
   }
   body {
-    background: var(--color-bg-white);
+    /* Matches the inline style on <body>: the ground the header and the overscroll sit on. */
+    background: var(--color-bg-strong);
     color: var(--color-text-strong);
     font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   }

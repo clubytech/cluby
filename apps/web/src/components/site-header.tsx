@@ -273,7 +273,10 @@ export function SiteHeader({
               aria-label="Menu"
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
-              className="flex h-6 w-6 flex-col items-center justify-center gap-1.5 xl:hidden"
+              /* The BARS stay 24px; the button around them becomes 44, which is the size a thumb
+                 actually is. `-mr-2.5` pulls the widened box back so the icon sits where it did —
+                 the target grows without the layout moving. */
+              className="-mr-2.5 flex h-11 w-11 flex-col items-center justify-center gap-1.5 xl:hidden"
             >
               <span
                 className={`block h-px w-6 bg-white transition-transform duration-300 ${open ? "translate-y-[3.5px] rotate-45" : ""}`}
@@ -297,20 +300,33 @@ export function SiteHeader({
               open ? "grid-rows-[minmax(0,1fr)]" : "grid-rows-[minmax(0,0fr)]"
             }`}
           >
-            <nav className="flex min-h-0 flex-col gap-1 px-2 pt-4">
-              {[...barItems, ...moreItems].map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`rounded-2xl px-4 py-3 text-sm transition-colors ${
-                    isActive(item.href) ? "bg-white/10 text-text-white" : "text-text-white hover:bg-white/5"
-                  }`}
-                >
-                  {item.label}
-                  {item.soon && <Soon />}
-                </Link>
-              ))}
-              <div className="mb-2 mt-3 flex flex-col items-center gap-3">
+            {/* Eleven destinations plus the wallet do not fit a phone, and the menu was simply
+                running off the bottom of the screen — Connect wallet, the one thing somebody opens
+                this to reach, was the part below the fold. So the panel is capped at the viewport
+                and the LIST scrolls inside it while the actions stay pinned where they can be
+                reached. `dvh` rather than `vh`, because a phone browser's address bar collapses as
+                you scroll and `vh` keeps measuring the taller version. */}
+            <div className="flex max-h-[calc(100dvh-7.5rem)] min-h-0 flex-col">
+              <nav
+                data-lenis-prevent
+                className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-2 pt-4"
+              >
+                {[...barItems, ...moreItems].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex shrink-0 items-center rounded-2xl px-4 py-3 text-[15px] transition-colors ${
+                      isActive(item.href) ? "bg-white/10 text-text-white" : "text-text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {item.label}
+                    {item.soon && <Soon />}
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Outside the scroller, so it is on screen whatever the list is doing. */}
+              <div className="mb-2 mt-3 flex shrink-0 flex-col items-center gap-3 px-2">
                 <CaChip address={tokenAddress} symbol={tokenSymbol} />
                 <ConnectButton />
                 <XLink
@@ -318,7 +334,7 @@ export function SiteHeader({
                   className="flex items-center gap-2 rounded-full px-4 py-2 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                 />
               </div>
-            </nav>
+            </div>
           </div>
         </div>
       </div>

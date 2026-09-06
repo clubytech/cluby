@@ -71,7 +71,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${serif.variable} ${mono.variable} antialiased`}
-        style={{ background: "#ffffff" }}
+        /*
+         * Dark, not white, and every page agrees: each one opens with a `bg-bg-strong` section, and
+         * the home page pulls its hero up UNDER the header so nothing shows through there either.
+         * White was visible in exactly the places nobody designs — the 24px the sticky header is
+         * inset by on inner pages, the whole area behind the mobile menu once it expands, and iOS's
+         * overscroll above the fold. It read as a bug because it was one.
+         */
+        style={{ background: "#002c1e" }}
       >
         <Providers>
           <SiteHeader

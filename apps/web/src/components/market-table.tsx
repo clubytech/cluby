@@ -59,7 +59,9 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
                 type="button"
                 data-active={category === c ? "true" : undefined}
                 onClick={() => setCategory(c)}
-                className={`relative z-10 rounded-full border px-4 py-1.5 text-xs transition-colors duration-300 ${
+                /* py-2.5 on a phone and back to py-1.5 from `sm` up: these are the control someone
+                   taps most on this page, and thirty pixels is a miss waiting to happen. */
+                className={`relative z-10 rounded-full border px-4 py-2.5 text-xs transition-colors duration-300 sm:py-1.5 ${
                   category === c
                     ? "border-transparent text-brand sm:border-transparent"
                     : "border-line text-text-soft hover:border-text-soft hover:text-text-strong"

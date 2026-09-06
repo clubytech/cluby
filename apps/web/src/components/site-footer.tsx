@@ -50,10 +50,15 @@ export function SiteFooter() {
             {columns.map((col) => (
               <div key={col.title}>
                 <p className="text-[11px] uppercase tracking-widest text-text-faint">{col.title}</p>
-                <ul className="mt-4 flex flex-col gap-3">
+                <ul className="mt-4 flex flex-col gap-1 sm:gap-3">
                   {col.links.map((l) => (
                     <li key={l.href}>
-                      <Link href={l.href} className="text-sm text-white/80 hover:text-white">
+                      {/* The padding is the target: bare text in a list is a 17px-tall thing to
+                          hit, and a footer is where someone is already squinting. */}
+                      <Link
+                        href={l.href}
+                        className="-mx-2 block rounded-lg px-2 py-2 text-sm text-white/80 transition-colors hover:bg-white/5 hover:text-white sm:mx-0 sm:px-0 sm:py-0 sm:hover:bg-transparent"
+                      >
                         {l.label}
                       </Link>
                     </li>
