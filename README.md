@@ -61,6 +61,31 @@ Every one of these is a comment in the code, not a blog post. They are here beca
 
 ---
 
+## Ask an agent about the protocol
+
+There is an [MCP server](apps/mcp) in here, so a model can read Cluby directly instead of being told
+about it. Everything about the present comes from the chain; only history and liquidations need the
+indexer, which is optional.
+
+```sh
+CLUBY_RPC_URL=<rpc> pnpm --filter @cluby/mcp start
+```
+
+| Tool | Answers |
+|---|---|
+| `list_markets` | every market, with price, rates and whether it exists on chain |
+| `get_market` | one market in detail |
+| `get_position` | a borrower's collateral, debt, health factor and liquidation price |
+| `quote_borrow` | what a borrow would do, and whether it exceeds the cap the app enforces |
+| `quote_multiply` | exposure, debt, LTV, health factor and liquidation price of a leveraged position |
+| `list_vaults` | the Earn side, with fee and timelock |
+| `protocol_facts` | addresses, fee split, LLTV tiers, how to take a free flash loan |
+
+The quotes are the same arithmetic the interface signs against, not a second implementation that
+can drift from it.
+
+---
+
 ## Repository layout
 
 ```
@@ -71,6 +96,7 @@ packages/config/        every address, market and risk parameter, in one place
 packages/sdk/           reads and transaction builders
 apps/web/               the interface (Next.js)
 apps/keeper/            the liquidation and oracle-divergence watchdog
+apps/mcp/               MCP server — markets, positions and pre-trade quotes for an agent
 apps/indexer/           Ponder indexer and the API the site reads
 ops/systemd/            how the keeper and indexer are actually run
 docs/                   chain research: what exists on this chain and what can be priced
