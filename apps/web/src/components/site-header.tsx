@@ -167,8 +167,8 @@ export function SiteHeader({
             boxy ? "rounded-[28px]" : "rounded-full"
           } ${
             scrolled
-              ? "shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_16px_44px_-22px_rgba(0,43,56,0.95)]"
-              : "shadow-[0_10px_40px_-20px_rgba(0,43,56,0.8)]"
+              ? "shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_16px_44px_-22px_rgba(0,44,30,0.95)]"
+              : "shadow-[0_10px_40px_-20px_rgba(0,44,30,0.8)]"
           }`}
         >
           <div className="relative flex h-9 items-center justify-between px-2">

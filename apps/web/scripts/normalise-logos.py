@@ -51,7 +51,7 @@ FIT_SHARE = 0.84
 SQUARE_BAND = (0.87, 1.15)
 SS = 4              # supersampling for the disc edge
 LIGHT_BG = (255, 255, 255, 255)
-DARK_BG = (0, 43, 56, 255)     # --color-bg-strong, so a dark disc still belongs to the palette
+DARK_BG = (0, 44, 30, 255)     # --color-bg-strong, so a dark disc still belongs to the palette
 # A mark pixel this close in luminance to its ground cannot be seen against it.
 INVISIBLE_WITHIN = 46
 

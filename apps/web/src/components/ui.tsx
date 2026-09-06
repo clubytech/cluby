@@ -11,9 +11,9 @@ export function Button({
   variant?: "primary" | "ghost" | "dark";
 }) {
   const styles = {
-    primary: "bg-brand-bright text-bg-deep hover:bg-white hover:shadow-[0_12px_30px_-14px_rgba(64,176,192,0.9)]",
+    primary: "bg-brand-bright text-bg-deep hover:bg-white hover:shadow-[0_12px_30px_-14px_rgba(64,192,156,0.9)]",
     ghost: "border border-white/25 text-white hover:border-white/50 hover:bg-white/10",
-    dark: "bg-bg-strong text-white hover:bg-bg-mid hover:shadow-[0_12px_30px_-16px_rgba(0,43,56,0.9)]",
+    dark: "bg-bg-strong text-white hover:bg-bg-mid hover:shadow-[0_12px_30px_-16px_rgba(0,44,30,0.9)]",
   }[variant];
   return (
     <Link

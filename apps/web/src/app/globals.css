@@ -2,31 +2,46 @@
 
 /*
  * Cluby design tokens.
- * Structure and scale are lifted from the reference capture (pill header, serif display,
- * 28px cards, light/dark band rhythm); the palette is ours, measured from assets/:
- * #002B38 deep ground, #003F4F mid, #00788C brand teal, #40B0C0 bright cyan, #F0F0F0 silver.
+ *
+ * Structure and scale are lifted from the reference capture (pill header, serif display, 28px
+ * cards, light/dark band rhythm); the palette is measured from `assets/logo.png` rather than picked:
+ * #0FAF83 where the light falls on the mark, #03926B in the body of it, #002C1E in the ground it
+ * sits on, near-white silver for the mark itself.
+ *
+ * The palette was teal until the rebrand, and it moved by ROTATING HUE and keeping saturation and
+ * lightness rather than by choosing new colours one at a time. The old ramp sat at about 190
+ * degrees, the logo's greens at about 163, so every token turned by the same 27 — which means every
+ * contrast the layout was built on survived the change intact, and nothing had to be re-checked for
+ * legibility. Only the three brand tokens are hand-set, onto colours sampled from the artwork.
  */
 @theme {
-  --color-bg-deep: #001b24;
-  --color-bg-strong: #002b38;
-  --color-bg-mid: #003f4f;
-  --color-bg-weak: #f1f4f5;
-  --color-bg-soft: #e3eaec;
+  --color-bg-deep: #00140d;
+  --color-bg-strong: #002c1e;
+  --color-bg-mid: #004f39;
+  --color-bg-weak: #f1f5f4;
+  --color-bg-soft: #e3ece9;
   --color-bg-white: #ffffff;
 
-  --color-brand: #00788c;
-  --color-brand-bright: #40b0c0;
-  --color-brand-dim: #0a5c6c;
+  --color-brand: #03926b;
+  --color-brand-bright: #40c09c;
+  --color-brand-dim: #0a6c50;
 
-  --color-text-strong: #06222b;
-  --color-text-sub: #204450;
-  --color-text-soft: #5f7c85;
+  --color-text-strong: #062b21;
+  --color-text-sub: #205042;
+  --color-text-soft: #5f857a;
   --color-text-white: #f0f0f0;
-  --color-text-faint: #9fb3b9;
+  --color-text-faint: #9fb9b2;
 
-  --color-line: #d7e1e4;
+  --color-line: #d7e4e0;
   --color-line-dark: rgba(240, 240, 240, 0.12);
 
+  /*
+   * `up` sits in the brand's own hue family now, and that is a deliberate acceptance rather than an
+   * oversight: a green brand cannot also own green as its "this one is good" signal without the
+   * signal meaning less. It stays because it is lighter than `brand` by enough to read as a state
+   * rather than as chrome, and because red and amber are still the only other hues on the site — so
+   * a colour that is NOT green is still doing all the warning.
+   */
   --color-up: #17a37b;
   --color-down: #e5484d;
   --color-warn: #f5a524;
@@ -90,7 +105,7 @@
   &:hover {
     transform: translateY(-3px);
     border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
-    box-shadow: 0 22px 50px -32px rgba(0, 43, 56, 0.55);
+    box-shadow: 0 22px 50px -32px rgba(0, 44, 30, 0.55);
   }
 }
 
@@ -183,7 +198,7 @@
   }
 }
 
-/* The same idea over a dark ground, where a teal wash disappears and white does not. */
+/* The same idea over a dark ground, where a green wash disappears and white does not. */
 @utility shine-dark {
   position: relative;
   overflow: hidden;

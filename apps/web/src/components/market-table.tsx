@@ -181,7 +181,7 @@ export function MarketTable({ markets, showFilters = true }: { markets: MarketVi
                       href={`/borrow/${m.key.toLowerCase()}`}
                       className={`press inline-block rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
                         m.status === "listed"
-                          ? "bg-bg-strong text-white group-hover:bg-brand group-hover:shadow-[0_10px_24px_-14px_rgba(0,120,140,0.9)]"
+                          ? "bg-bg-strong text-white group-hover:bg-brand group-hover:shadow-[0_10px_24px_-14px_rgba(3,146,107,0.9)]"
                           : "border border-line text-text-soft group-hover:border-text-soft group-hover:text-text-strong"
                       }`}
                     >

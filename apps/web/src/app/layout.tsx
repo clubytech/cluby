@@ -47,6 +47,17 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * The colour a mobile browser paints its own chrome with.
+ *
+ * There was none, so Safari and Chrome drew their bars in white above a page whose top is nearly
+ * black — a seam across the top of every phone. It is the header's own ground, so the page appears
+ * to start at the top of the screen rather than below a white strip.
+ */
+export const viewport = {
+  themeColor: "#002c1e",
+};
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const listing = await getTokenListing();
 

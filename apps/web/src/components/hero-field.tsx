@@ -289,18 +289,18 @@ const css = `
   /* The top of a column is where it stops existing, not where it gets cut off. */
   -webkit-mask-image: linear-gradient(to top, #000 0%, #000 62%, transparent 100%);
   mask-image: linear-gradient(to top, #000 0%, #000 62%, transparent 100%);
-  /* Brighter than a wash: a hot cyan foot that carries most of the light, cooling as it rises. */
+  /* Brighter than a wash: a hot green foot that carries most of the light, cooling as it rises. */
   background: linear-gradient(
     to top,
-    rgb(150 240 252 / calc(var(--tint) + 0.62)) 0%,
-    rgb(64 200 220 / calc(var(--tint) + 0.34)) 30%,
-    rgb(64 176 192 / calc(var(--tint) * 0.36)) 100%
+    rgb(150 252 223 / calc(var(--tint) + 0.62)) 0%,
+    rgb(64 220 176 / calc(var(--tint) + 0.34)) 30%,
+    rgb(64 192 156 / calc(var(--tint) * 0.36)) 100%
   );
   /* No animated box-shadow here, deliberately. Driving a blur radius from a custom property
      repaints a blurred region per element per frame -- 56 of them -- and the cost compounds until
      the whole page stutters. The glow is a separate, static layer below; only its opacity moves,
      and opacity composites. */
-  box-shadow: 0 0 16px rgb(90 210 230 / calc(var(--tint) * 0.5));
+  box-shadow: 0 0 16px rgb(90 230 190 / calc(var(--tint) * 0.5));
   animation:
     hero-rise 1.1s cubic-bezier(0.16, 1, 0.3, 1) var(--delay) backwards,
     hero-breathe var(--breathe) ease-in-out calc(var(--delay) + 1.1s) infinite;
@@ -328,8 +328,8 @@ const css = `
   bottom: -8%;
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: rgb(190 240 250 / 0.62);
-  text-shadow: 0 0 14px rgb(64 176 192 / 0.45);
+  color: rgb(190 250 233 / 0.62);
+  text-shadow: 0 0 14px rgb(64 192 156 / 0.45);
   animation: hero-drift var(--dur) linear var(--delay) infinite;
 }
 
@@ -346,7 +346,7 @@ const css = `
   bottom: -30%;
   height: 56%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgb(0 150 175 / 0.5), transparent 65%);
+  background: radial-gradient(ellipse at center, rgb(0 175 125 / 0.5), transparent 65%);
   filter: blur(28px);
   will-change: transform;
 }
@@ -357,11 +357,11 @@ const css = `
   background: linear-gradient(
     to bottom,
     var(--color-bg-deep) 0%,
-    rgb(0 27 36 / 0.88) 22%,
-    rgb(0 27 36 / 0.5) 42%,
-    rgb(0 27 36 / 0.06) 64%,
-    rgb(0 27 36 / 0.35) 84%,
-    rgb(0 27 36 / 0.92) 100%
+    rgb(0 36 26 / 0.88) 22%,
+    rgb(0 36 26 / 0.5) 42%,
+    rgb(0 36 26 / 0.06) 64%,
+    rgb(0 36 26 / 0.35) 84%,
+    rgb(0 36 26 / 0.92) 100%
   );
 }
 

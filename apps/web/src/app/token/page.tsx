@@ -262,7 +262,7 @@ export default async function TokenPage() {
 
           {/* Paid out of the same fee, to the two groups that generate it. */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,43,56,0.5)]">
+            <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,44,30,0.5)]">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-soft">
                 Borrower rebate
               </p>
@@ -277,7 +277,7 @@ export default async function TokenPage() {
               </p>
             </Card>
 
-            <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,43,56,0.5)]">
+            <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,44,30,0.5)]">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-soft">
                 Builder share
               </p>
@@ -293,7 +293,7 @@ export default async function TokenPage() {
               </p>
             </Card>
 
-            <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,43,56,0.5)]">
+            <Card className="group border border-line transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[0_20px_50px_-30px_rgba(0,44,30,0.5)]">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-soft">
                 Flash loan fee
               </p>
