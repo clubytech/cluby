@@ -49,12 +49,39 @@ let tip = 0n;
 let tipAt = 0;
 
 /**
+ * Set once the archive has told us it is out of allowance, and never unset.
+ *
+ * A metered endpoint that has run out does not fail quietly — it answers every single call with a
+ * 429, promptly. Left alone, a backfill would spend its whole request budget being refused, three
+ * times per snapshot, for as long as the process lives: the indexer keeps following the chain
+ * either way, so nothing looks broken, and the only visible symptom is that historical chart rows
+ * silently never appear.
+ *
+ * So the first refusal is believed and the rest are not sent. Snapshots at the tip are unaffected —
+ * those go to the public node — and history simply stops being written until there is an archive
+ * again, which is the honest outcome rather than a hidden one.
+ */
+let archiveSpent = false;
+
+function noteArchiveFailure(e: unknown) {
+  if (archiveSpent) return;
+  const text = String((e as { shortMessage?: string; message?: string })?.shortMessage ?? e);
+  if (/429|capacity|quota|exceeded|payment required|402/i.test(text)) {
+    archiveSpent = true;
+    console.warn(
+      "[snapshot] the archive endpoint is out of allowance; historical snapshots are paused. " +
+        "Live snapshots continue on the public node, and nothing else here uses the archive.",
+    );
+  }
+}
+
+/**
  * The public node for anything near the tip, the archive for the rest.
  *
  * In steady state — live indexing, one snapshot every five minutes at the block that just arrived —
  * this never touches the archive at all. It is only the backfill, which runs once, that needs it.
  */
-async function clientFor(blockNumber: bigint) {
+async function clientFor(blockNumber: bigint): Promise<typeof live | null> {
   const now = Date.now();
   if (now - tipAt > 30_000) {
     // A failure here must not decide the routing: fall through to the archive, which is correct at
@@ -65,7 +92,10 @@ async function clientFor(blockNumber: bigint) {
       tipAt = now;
     }
   }
-  return tip > 0n && blockNumber + PUBLIC_STATE_DEPTH >= tip ? live : archive;
+  const nearTip = tip > 0n && blockNumber + PUBLIC_STATE_DEPTH >= tip;
+  if (nearTip) return live;
+  // Deep history with no archive left to ask: say so rather than send a call that cannot succeed.
+  return archiveSpent ? null : archive;
 }
 
 const BLUE = morpho.blue.address as `0x${string}`;
@@ -92,6 +122,7 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
   if (marketIds.length === 0) return;
 
   const rpc = await clientFor(blockNumber);
+  if (!rpc) return;
 
   const paramsAndState = await rpc
     .multicall({
@@ -102,7 +133,10 @@ ponder.on("Snapshot:block", async ({ event, context }) => {
       blockNumber,
       allowFailure: true,
     })
-    .catch(() => null);
+    .catch((e) => {
+      noteArchiveFailure(e);
+      return null;
+    });
   // A snapshot is a nice-to-have; a failed one must not stop the indexer following the chain.
   if (!paramsAndState) return;
 
