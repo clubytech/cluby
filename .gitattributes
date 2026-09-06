@@ -1,0 +1,6 @@
+# Vendored dependencies. Without this GitHub reports the repository as mostly somebody else's
+# Solidity, because forge-std, OpenZeppelin, MetaMorpho and the pre-liquidation contracts together
+# outweigh everything we wrote by an order of magnitude.
+contracts/lib/** linguist-vendored
+contracts/broadcast/** linguist-generated
+apps/web/public/logos/** linguist-generated
