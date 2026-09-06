@@ -4,6 +4,7 @@ import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { getTokenListing } from "@/lib/token-listing";
+import { OG_IMAGE } from "@/lib/og-image";
 import "./globals.css";
 
 // Inter is variable, so every weight between 100 and 900 is already in the one file: asking for
@@ -36,14 +37,14 @@ export const metadata: Metadata = {
     title: "Cluby — credit against tokenized stocks",
     description:
       "Borrow USDG against tokenized stocks. Isolated Morpho Blue markets, Chainlink oracles, zero performance fee.",
-    images: ["/cluby-banner.png"],
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: "Cluby — credit against tokenized stocks",
     description:
       "Borrow USDG against tokenized stocks. Isolated Morpho Blue markets, Chainlink oracles, zero performance fee.",
-    images: ["/cluby-banner.png"],
+    images: [OG_IMAGE],
   },
 };
 
