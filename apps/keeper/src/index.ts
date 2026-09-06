@@ -5,7 +5,7 @@
  * signs), LENS_ADDR, FLASH_LIQ_ADDR, PONDER_URL, TELEGRAM_TOKEN, TELEGRAM_CHAT, POLL_MS,
  * WATCHDOG_MS, DIVERGENCE_BPS, MIN_PROFIT_USD, PROFIT_MARGIN_BPS, GAS_FLOOR.
  */
-import { alert } from "./alerts.ts";
+import { alert, isTransportFailure } from "./alerts.ts";
 import { refreshBorrowers } from "./borrowers.ts";
 import { scanHealth, tryLiquidate, warnIfClose } from "./liquidate.ts";
 import { watchdogPass } from "./watchdog.ts";
@@ -61,6 +61,14 @@ async function safely(name: string, fn: () => Promise<void>) {
     await fn();
   } catch (e) {
     // The message can carry the RPC URL, and the RPC URL carries the key; alert() redacts it.
+    // A pass that failed because nobody answered the phone is a different thing from a pass that
+    // failed on chain, and only one of them is about Cluby. The watchdog already reports an
+    // unreachable node once for the whole run, so this stays quiet rather than saying it again in
+    // different words — which is what produced two near-identical alerts for one outage.
+    if (isTransportFailure(e)) {
+      log(`${name} pass skipped: the node is not answering`);
+      return;
+    }
     await alert(`pass-failed:${name}`, `The ${name} pass is failing: ${revertReason(e)}`);
   }
 }

@@ -1,7 +1,7 @@
 import type { Hex } from "viem";
 import { marketCatalog, stocks, nativeTokens, tokens } from "@cluby/config";
 import { readTwap, readPoolHealth } from "@cluby/sdk";
-import { alert } from "./alerts.ts";
+import { alert, isTransportFailure, recovered } from "./alerts.ts";
 import { DIVERGENCE_BPS, GAS_FLOOR, MARKETS, account, log, pub } from "./env.ts";
 
 const ORACLE_SCALE = 10n ** 36n;
@@ -25,6 +25,9 @@ const tokenFor = (symbol: string) =>
 export async function watchdogPass() {
   await checkGas();
 
+  // Set by any market whose read failed for transport reasons; reported once, at the end.
+  let transportFailed = false;
+
   for (const [key, deployed] of Object.entries(MARKETS)) {
     const def = marketCatalog.find((m) => m.key === key);
     if (!def) continue;
@@ -34,17 +37,28 @@ export async function watchdogPass() {
     const token = tokenFor(subject);
     if (!pool || !token) continue;
 
-    const oraclePrice = await pub
-      .readContract({
+    let oraclePrice: bigint | null = null;
+    try {
+      oraclePrice = await pub.readContract({
         address: deployed.oracle as Hex,
         abi: [{ type: "function", name: "price", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] }],
         functionName: "price",
-      })
-      .catch(() => null);
-    if (!oraclePrice) {
-      await alert(`oracle-dead:${key}`, `${key}: the oracle did not answer. Nothing can be liquidated on this market until it does.`);
+      });
+    } catch (e) {
+      // A host that is not answering is ONE fact about the run, not one fact per market. Reporting
+      // it per market turned a single outage into a page of alerts, each naming a healthy oracle.
+      if (isTransportFailure(e)) {
+        transportFailed = true;
+        continue;
+      }
+      await alert(
+        `oracle-dead:${key}`,
+        `${key}: the oracle reverted. Nothing can be liquidated on this market until it answers again.`,
+      );
       continue;
     }
+    await recovered(`oracle-dead:${key}`, `${key}: the oracle is answering again.`);
+    if (!oraclePrice) continue;
 
     const twap = await readTwap(pub, pool.address as Hex, token as Hex, "0x" as Hex, {
       windowSeconds: 1800,
@@ -77,6 +91,17 @@ export async function watchdogPass() {
         `${key}: the oracle says ${oracleHuman.toFixed(2)} and the pool says ${twap.price.toFixed(2)} — ${(divergenceBps / 100).toFixed(2)}% apart. Set this market's cap to 0 in the vault and pull the liquidity until they agree.`,
       );
     }
+  }
+
+  // One sentence about the run, whatever the outage touched, and one when it comes back. The point
+  // is that a phone should be able to answer "is it still broken?" without opening a terminal.
+  if (transportFailed) {
+    await alert(
+      "rpc-unreachable",
+      "The node is not answering, so no market can be checked and nothing could be liquidated right now. The oracles and the contracts are not implicated — this is the RPC endpoint.",
+    );
+  } else {
+    await recovered("rpc-unreachable", "The node is answering again. Markets are being checked normally.");
   }
 }
 

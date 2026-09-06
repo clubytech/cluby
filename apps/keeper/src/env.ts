@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, http, type Hex } from "viem";
+import { createPublicClient, createWalletClient, fallback, http, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { robinhoodChain, deployments, morpho } from "@cluby/config";
 
@@ -62,12 +62,32 @@ export const CATCHUP_MS = Number(process.env.CATCHUP_MS ?? 1500);
 if (!LENS || !LIQUIDATOR) throw new Error("no Lens or FlashLiquidator address — deploy first");
 
 const chain = { ...robinhoodChain, rpcUrls: { default: { http: [RPC] } } };
-const transport = http(RPC, {
-  // The public node 403s eth_call without a User-Agent; harmless to send on any endpoint.
-  fetchOptions: { headers: { "user-agent": "cluby-keeper/1.0" } },
-  retryCount: 3,
-  timeout: 15_000,
-});
+
+const endpoint = (url: string) =>
+  http(url, {
+    // The public node 403s eth_call without a User-Agent; harmless to send on any endpoint.
+    fetchOptions: { headers: { "user-agent": "cluby-keeper/1.0" } },
+    retryCount: 3,
+    timeout: 15_000,
+  });
+
+/**
+ * The free node first, a paid one behind it.
+ *
+ * The public endpoint went unreachable for about an hour overnight and the keeper went blind with
+ * it: it could not read a single oracle, so it could not have liquidated anything, and it said so
+ * once per market. Nothing was wrong with the chain or the contracts — one host was down, and the
+ * keeper had been given exactly one host.
+ *
+ * The order is deliberate. The free node stays primary because it is unmetered and liquidation
+ * safety should not quietly consume someone's allowance; the paid one only carries traffic in the
+ * minutes the free one is refusing, which is precisely when being blind is expensive. Set
+ * RPC_URL_FALLBACK to enable it — with nothing set this is exactly the single transport it was.
+ */
+const FALLBACK = process.env.RPC_URL_FALLBACK;
+const transport = FALLBACK
+  ? fallback([endpoint(RPC), endpoint(FALLBACK)], { rank: false, retryCount: 0 })
+  : endpoint(RPC);
 
 export const pub = createPublicClient({ chain, transport });
 
