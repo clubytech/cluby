@@ -52,6 +52,9 @@ contract MerkleDistributor is Ownable2Step {
 
     /// @notice Publish an epoch. The tokens for it must already be here.
     function publish(uint256 epoch, bytes32 root, uint256 total) external onlyOwner {
+        // Epochs start at 1: `_outstanding`, `latestEpoch` and every reader count from there, so an
+        // epoch 0 would never be counted against the balance again.
+        if (epoch == 0) revert UnknownEpoch(epoch);
         if (epochs[epoch].root != bytes32(0)) revert EpochExists(epoch);
 
         // Everything unclaimed across all epochs, plus this one, has to be covered by the balance:

@@ -202,6 +202,14 @@ contract MerkleDistributorTest is Test {
         vm.stopPrank();
     }
 
+    function test_epochZeroIsRefused() public {
+        (bytes32 root, , ) = _tree(alice, 100e6, bob, 50e6);
+        usdg.mint(address(dist), 150e6);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(MerkleDistributor.UnknownEpoch.selector, 0));
+        dist.publish(0, root, 150e6);
+    }
+
     function test_sweepOnlyAfterNinetyDays() public {
         (bytes32 root, , ) = _tree(alice, 100e6, bob, 50e6);
         usdg.mint(address(dist), 150e6);
