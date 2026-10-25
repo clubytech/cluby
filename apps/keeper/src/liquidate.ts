@@ -142,7 +142,10 @@ export async function tryLiquidate(c: Candidate) {
   const lif = liquidationIncentiveFactor(params.lltv);
 
   // Seize the most that clears the whole debt, capped by what the borrower actually posted.
-  const seizeForFullDebt = (((c.debt * lif) / WAD) * ORACLE_SCALE) / price;
+  // One base unit short of the Lens debt: that debt is the borrower's shares rounded UP, and Morpho
+  // rounds the seize back into shares UP again, so sizing for the full figure repays more shares than
+  // the position holds and `liquidate` underflows. What is left is under one base unit of debt.
+  const seizeForFullDebt = c.debt > 1n ? ((((c.debt - 1n) * lif) / WAD) * ORACLE_SCALE) / price : 0n;
   const seized = seizeForFullDebt < c.collateral ? seizeForFullDebt : c.collateral;
   if (seized === 0n) return;
 
